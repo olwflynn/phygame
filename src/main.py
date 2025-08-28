@@ -23,7 +23,7 @@ def main() -> None:
         space = create_world((0, 900))  # Gravity: 900 pixels/s² downward
         ground = create_ground(space, y=500, width=960)  # Ground at y=500, spans full width
         target = create_target(space, pos=(800, 400), size=(40, 40))  # Target at (800, 400)
-        bird = create_bird(space, pos=(120, 430), radius=14)  # Bird at (120, 430)
+        bird = create_bird(space, pos=(120, 430), radius=14, velocity=(0,0))  # Bird at (120, 430)
 
         # Game state
         running = True
@@ -32,6 +32,8 @@ def main() -> None:
         score = 0
         shots_fired = 0
         max_shots = 3
+        birds = []
+        birds.append(bird)
 
         while running:
             for event in pygame.event.get():
@@ -39,51 +41,65 @@ def main() -> None:
                     running = False
                 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Only allow launching if bird is at start position and shots remaining
-                    if (bird.body.position.x < 150 and bird.body.position.y < 450 and 
-                        shots_fired < max_shots):
+                    if shots_fired < max_shots and bird.body.position.x < 500:
                         start_pos = pygame.mouse.get_pos()
                         launching = True
 
                 elif event.type == pygame.MOUSEBUTTONUP and launching:
                     end_pos = pygame.mouse.get_pos()
+
                     # Calculate launch direction: from start to end (opposite of current)
-                    dx = end_pos[0] - start_pos[0]
-                    dy = end_pos[1] - start_pos[1]
+                    dx = start_pos[0] - end_pos[0]  # Reverse X direction (left drag = right launch)
+                    dy = start_pos[1] - end_pos[1]  # Reverse Y direction (up drag = down launch)
+                    velocity = (dx * 3, dy * 3)
+                    bird.body.apply_impulse_at_local_point(velocity)
                     
+                    shots_fired += 1
+
                     # Calculate force magnitude based on drag distance
                     force_magnitude = min(((dx**2 + dy**2)**0.5) * 0.5, 800)
-                    
-                    # Apply impulse in the direction of the drag
-                    if force_magnitude > 10:  # Minimum force threshold
-                        bird.body.apply_impulse_at_local_point((dx * 0.3, dy * 0.3))
-                        shots_fired += 1
+                    print(f"Force magnitude: {force_magnitude}")
+                    print(f"dx: {dx}, dy: {dy}")
+                    print(f"Drag: start={start_pos} -> end={end_pos}")
+                    print(f"Launch: bird will go ({dx}, {dy}) direction")
                     
                     launching = False
-                    start_pos = None
-                
+
+                    print(f"\n=== SPACE CONTENTS ===")
+                    print(f"Bodies: {len(space.bodies)}, Shapes: {len(space.shapes)}")
+                    for i, body in enumerate(space.bodies):
+                        body_type = "DYNAMIC" if body.body_type == body.DYNAMIC else "STATIC"
+                        print(f"  Body {i}: pos=({body.position.x:.1f}, {body.position.y:.1f}), "
+                                f"type={body_type}, mass={body.mass}")
+                    print("=====================\n")
+
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:  # Reset button
-                        reset_game(bird, target, space)
+                        bird = reset_game(bird, target, space)
                         score = 0
                         shots_fired = 0
 
             # Step physics simulation (60 FPS)
             space.step(1/60)
             
-            # Check if bird needs reset
-            if bird.body.position.y > 600 or bird.body.position.x > 1000:  # Fell off screen
-                reset_bird(bird)
-            
             # Check for target hit
             if check_target_hit(bird, target):
                 score += 100
                 reset_target(target)
-                reset_bird(bird)
+                bird = reset_bird(space, bird)
                 shots_fired = 0  # Reset shots for new target
 
+            # Reset bird if it's moving very slowly (landed)
+            if (abs(bird.body.velocity.x) < 5 and 
+                abs(bird.body.velocity.y) < 5 and 
+                shots_fired > 0 and
+                bird.body.position.x > 500):
+                
+                bird = reset_bird(space, bird)
+                print("Bird auto-reset - landed")
+
             # Render everything
-            render_game(screen, space, bird, target, launching, start_pos, score, shots_fired, max_shots, font)
+            render_game(screen, space, bird, target, launching, start_pos, score, shots_fired, max_shots, font, width, height)
 
             pygame.display.flip()
             clock.tick(60)
@@ -91,11 +107,11 @@ def main() -> None:
         pygame.quit()
 
 
-def reset_bird(bird):
-    """Reset bird to starting position"""
-    bird.body.position = (120, 430)
-    bird.body.velocity = (0, 0)
-    bird.body.angular_velocity = 0
+def reset_bird(space, bird):
+    space.remove(bird.body)
+    space.remove(bird)
+    bird = create_bird(space, pos=(120, 430), radius=14, velocity= (0,0))  # Bird at (120, 430)
+    return bird
 
 
 def reset_target(target):
@@ -107,8 +123,9 @@ def reset_target(target):
 
 def reset_game(bird, target, space):
     """Reset entire game state"""
-    reset_bird(bird)
+    bird = reset_bird(space, bird)
     reset_target(target)
+    return bird
 
 
 def check_target_hit(bird, target):
@@ -121,7 +138,7 @@ def check_target_hit(bird, target):
     return distance < 30  # Bird radius + half target size
 
 
-def render_game(screen, space, bird, target, launching, start_pos, score, shots_fired, max_shots, font):
+def render_game(screen, space, bird, target, launching, start_pos, score, shots_fired, max_shots, font, width, height):
     """Render the entire game"""
     # Draw sky background (gradient effect)
     for y in range(540):
@@ -149,10 +166,6 @@ def render_game(screen, space, bird, target, launching, start_pos, score, shots_
     pygame.draw.rect(screen, (34, 139, 34), (0, 500, 960, 40))  # Grass
     pygame.draw.rect(screen, (139, 69, 19), (0, 540, 960, 20))  # Dirt
     
-    # Draw slingshot
-    pygame.draw.rect(screen, (101, 67, 33), (110, 430, 20, 70))  # Slingshot base
-    pygame.draw.circle(screen, (139, 69, 19), (120, 430), 15)    # Slingshot cup
-    
     # Draw target (house)
     target_pos = target.body.position
     # House base
@@ -178,13 +191,13 @@ def render_game(screen, space, bird, target, launching, start_pos, score, shots_
         pygame.draw.line(screen, (255, 255, 0), start_pos, current_pos, 3)
         # Draw arrowhead to show direction
         if current_pos != start_pos:
-            dx = current_pos[0] - start_pos[0]
-            dy = current_pos[1] - start_pos[1]
+            line_dx = current_pos[0] - start_pos[0]
+            line_dy = current_pos[1] - start_pos[1]
             # Normalize and scale for arrowhead
-            length = (dx**2 + dy**2)**0.5
+            length = (line_dx**2 + line_dy**2)**0.5
             if length > 0:
-                dx_norm = dx / length * 20
-                dy_norm = dy / length * 20
+                dx_norm = line_dx / length * 20
+                dy_norm = line_dy / length * 20
                 arrow_tip = (current_pos[0] + dx_norm, current_pos[1] + dy_norm)
                 pygame.draw.line(screen, (255, 255, 0), current_pos, arrow_tip, 3)
     
@@ -198,7 +211,7 @@ def render_game(screen, space, bird, target, launching, start_pos, score, shots_
     screen.blit(shots_text, (20, 60))
     
     # Reset button
-    reset_text = font.render("Press R to Reset", True, (255, 255, 255))
+    reset_text = font.render("Press R to Reset", True, (255, 0, 0))
     screen.blit(reset_text, (20, 100))
     
     # Game over message

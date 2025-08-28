@@ -21,7 +21,7 @@ def create_target(space: pymunk.Space, pos: Tuple[float, float], size: Tuple[flo
     return shape
 
 
-def create_bird(space: pymunk.Space, pos: Tuple[float, float], radius: float) -> pymunk.Circle:
+def create_bird(space: pymunk.Space, pos: Tuple[float, float], radius: float, velocity: Tuple[float, float]) -> pymunk.Circle:
     mass = 1.0
     moment = pymunk.moment_for_circle(mass, 0, radius)
     body = pymunk.Body(mass, moment)
@@ -30,4 +30,5 @@ def create_bird(space: pymunk.Space, pos: Tuple[float, float], radius: float) ->
     shape.friction = 0.6
     shape.elasticity = 0.4
     space.add(body, shape)
+    body.apply_impulse_at_local_point(velocity)
     return shape
