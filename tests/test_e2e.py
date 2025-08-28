@@ -1,7 +1,6 @@
 import pytest
 import pygame
 import os
-from src.main import main
 
 
 class TestE2E:
