@@ -1,7 +1,13 @@
 import pytest
 import pymunk
-from src.game.physics import create_world
-from src.game.entities import create_ground, create_target, create_bird
+import sys
+import os
+
+# Add src directory to Python path so we can import from main.py
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from game.physics import create_world
+from game.entities import create_ground, create_target, create_bird
 
 
 class TestGameLogic:
@@ -21,7 +27,7 @@ class TestGameLogic:
         self.bird.body.velocity = (100, 50)
         
         # Import and test reset function
-        from src.main import reset_bird
+        from main import reset_bird
         new_bird = reset_bird(self.space, self.bird)
         
         # Check new bird is at starting position
@@ -46,7 +52,7 @@ class TestGameLogic:
         self.target.body.angular_velocity = 1.5
         
         # Import and test reset function
-        from src.main import reset_target
+        from main import reset_target
         reset_target(self.target)
         
         # Check target is reset to starting position
@@ -63,7 +69,7 @@ class TestGameLogic:
         self.target.body.position = (600, 300)
         
         # Import and test reset function
-        from src.main import reset_game
+        from main import reset_game
         new_bird = reset_game(self.bird, self.target, self.space)
         
         # Check bird is reset
@@ -79,7 +85,7 @@ class TestGameLogic:
         # Position bird close to target (within collision distance)
         self.bird.body.position = (800, 400)  # Same position as target
         
-        from src.main import check_target_hit
+        from main import check_target_hit
         assert check_target_hit(self.bird, self.target) is True
     
     def test_check_target_hit_when_close(self):
@@ -89,7 +95,7 @@ class TestGameLogic:
         # Bird at (800, 366) is 34 pixels above center - within collision boundary
         self.bird.body.position = (800, 366)  # 34 pixels above target center
         
-        from src.main import check_target_hit
+        from main import check_target_hit
         assert check_target_hit(self.bird, self.target) is True
     
     def test_check_target_hit_when_miss(self):
@@ -97,7 +103,7 @@ class TestGameLogic:
         # Position bird far from target (outside collision distance)
         self.bird.body.position = (800, 300)  # 100 pixels above target center
         
-        from src.main import check_target_hit
+        from main import check_target_hit
         assert check_target_hit(self.bird, self.target) is False
     
     def test_check_target_hit_edge_case(self):
@@ -106,7 +112,7 @@ class TestGameLogic:
         # Target center is at (800, 400), so 34 pixels above is (800, 366)
         self.bird.body.position = (800, 366)  # 34 pixels above target center
         
-        from src.main import check_target_hit
+        from main import check_target_hit
         assert check_target_hit(self.bird, self.target) is True
         
         # Position bird just outside collision boundary
@@ -125,7 +131,7 @@ class TestGameLogic:
             abs(self.bird.body.velocity.y) < 5 and 
             self.bird.body.position.x > 500):
             
-            from src.main import reset_bird
+            from main import reset_bird
             new_bird = reset_bird(self.space, self.bird)
             
             # Check bird is reset to starting position
@@ -139,7 +145,7 @@ class TestGameLogic:
         
         # Simulate the out-of-bounds reset logic
         if self.bird.body.position.x < 100:
-            from src.main import reset_bird
+            from main import reset_bird
             new_bird = reset_bird(self.space, self.bird)
             assert new_bird.body.position.x == 120
             
@@ -150,7 +156,7 @@ class TestGameLogic:
         self.bird.body.position = (1000, 300)  # x > 960
         
         if self.bird.body.position.x > 960:
-            from src.main import reset_bird
+            from main import reset_bird
             new_bird = reset_bird(self.space, self.bird)
             assert new_bird.body.position.x == 120
     

@@ -1,7 +1,13 @@
 import pytest
 import pymunk
-from src.game.physics import create_world
-from src.game.entities import create_ground, create_target, create_bird
+import sys
+import os
+
+# Add src directory to Python path so we can import from main.py
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from game.physics import create_world
+from game.entities import create_ground, create_target, create_bird
 
 
 class TestGameState:
