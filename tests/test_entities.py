@@ -25,7 +25,7 @@ class TestEntities:
 
     def test_create_bird(self):
         space = pymunk.Space()
-        bird = create_bird(space, pos=(120.0, 430.0), radius=14.0)
+        bird = create_bird(space, pos=(120.0, 430.0), radius=14.0, velocity=(0.0, 0.0))
         
         assert isinstance(bird, pymunk.Circle)
         assert bird.friction == 0.6
@@ -33,3 +33,19 @@ class TestEntities:
         assert bird.body.body_type == pymunk.Body.DYNAMIC
         assert bird.body.mass == 1.0
         assert bird.radius == 14.0
+
+    def test_create_bird_with_velocity(self):
+        """Test creating bird with initial velocity"""
+        space = pymunk.Space()
+        bird = create_bird(space, pos=(120.0, 430.0), radius=14.0, velocity=(100.0, -50.0))
+        
+        assert bird.body.velocity.x == 100.0
+        assert bird.body.velocity.y == -50.0
+
+    def test_create_bird_default_velocity(self):
+        """Test creating bird without velocity (should default to 0,0)"""
+        space = pymunk.Space()
+        bird = create_bird(space, pos=(120.0, 430.0), radius=14.0, velocity=(0.0, 0.0))
+        
+        assert bird.body.velocity.x == 0.0
+        assert bird.body.velocity.y == 0.0

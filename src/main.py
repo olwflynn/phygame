@@ -2,8 +2,8 @@ import os
 import sys
 
 import pygame
-from game.physics import create_world
-from game.entities import create_ground, create_target, create_bird
+from src.game.physics import create_world
+from src.game.entities import create_ground, create_target, create_bird
 import pymunk
 import pymunk.pygame_util
 
@@ -32,8 +32,6 @@ def main() -> None:
         score = 0
         shots_fired = 0
         max_shots = 3
-        birds = []
-        birds.append(bird)
 
         while running:
             for event in pygame.event.get():
@@ -55,23 +53,7 @@ def main() -> None:
                     bird.body.apply_impulse_at_local_point(velocity)
                     
                     shots_fired += 1
-
-                    # Calculate force magnitude based on drag distance
-                    force_magnitude = min(((dx**2 + dy**2)**0.5) * 0.5, 800)
-                    print(f"Force magnitude: {force_magnitude}")
-                    print(f"dx: {dx}, dy: {dy}")
-                    print(f"Drag: start={start_pos} -> end={end_pos}")
-                    print(f"Launch: bird will go ({dx}, {dy}) direction")
-                    
                     launching = False
-
-                    print(f"\n=== SPACE CONTENTS ===")
-                    print(f"Bodies: {len(space.bodies)}, Shapes: {len(space.shapes)}")
-                    for i, body in enumerate(space.bodies):
-                        body_type = "DYNAMIC" if body.body_type == body.DYNAMIC else "STATIC"
-                        print(f"  Body {i}: pos=({body.position.x:.1f}, {body.position.y:.1f}), "
-                                f"type={body_type}, mass={body.mass}")
-                    print("=====================\n")
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:  # Reset button
@@ -93,10 +75,11 @@ def main() -> None:
             if (abs(bird.body.velocity.x) < 5 and 
                 abs(bird.body.velocity.y) < 5 and 
                 shots_fired > 0 and
-                bird.body.position.x > 500):
-                
+                bird.body.position.x > 500):                
                 bird = reset_bird(space, bird)
-                print("Bird auto-reset - landed")
+
+            if bird.body.position.x > 960 or bird.body.position.x < 100:
+                bird = reset_bird(space, bird)
 
             # Render everything
             render_game(screen, space, bird, target, launching, start_pos, score, shots_fired, max_shots, font, width, height)
@@ -135,7 +118,7 @@ def check_target_hit(bird, target):
     
     # Simple distance-based collision detection
     distance = ((bird_pos.x - target_pos.x)**2 + (bird_pos.y - target_pos.y)**2)**0.5
-    return distance < 30  # Bird radius + half target size
+    return distance < 35  # Bird radius + half target size
 
 
 def render_game(screen, space, bird, target, launching, start_pos, score, shots_fired, max_shots, font, width, height):
