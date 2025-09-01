@@ -1,92 +1,118 @@
 from dataclasses import dataclass
 from typing import Tuple
 import math, random
+import matplotlib.pyplot as plt
+
 from . import config
+from . import entities
 
 @dataclass
 class ShotSuggestion:
     angle_deg: float
-    force: float
+    impulse_magnitude: float
 
-def _simulate_shot(angle_deg, force, start_pos, target_pos, target_size, bird_radius, gravity, dt=1/60.0, max_time=3.0):
+def _simulate_shot(angle_deg, impulse_magnitude):
     """
-    Simulate a shot with given angle and force.
+    Simulate a shot with given angle and impulse magnitude.
     Returns True if the bird hits the target bounding box.
     """
+     # Create physics world and entities
+    space = entities.create_world((0, 900))  # Gravity: 900 pixels/s² downward
+    ground = entities.create_ground(space, y=500, width=960)  # Target starts on the ground
+    target = entities.create_target(space, pos=(800, 480), size=(40, 40))  # Target starts on the ground
+    bird = entities.create_bird(space, pos=(120, 485), radius=14, velocity=(0,0))  # Bird starts on the ground
+    
+    
+    # Convert angle_deg and impulse_magnitude into velocity vector
     angle_rad = math.radians(angle_deg)
-    vx = force * math.cos(angle_rad)
-    vy = -force * math.sin(angle_rad)  # Negative because y increases downward
+    vx = impulse_magnitude * math.cos(angle_rad)
+    vy = -impulse_magnitude * math.sin(angle_rad)  # Negative because y increases downward in screen coordinates
+    velocity = (vx, vy)
+    bird.body.apply_impulse_at_local_point(velocity)
 
-    x, y = start_pos
-    t = 0.0
+    running = True
+    while running:
+    
+        space.step(1/60)
 
-    target_x, target_y = target_pos
-    target_w, target_h = target_size
-
-    # Target bounding box
-    left = target_x - target_w / 2 - bird_radius
-    right = target_x + target_w / 2 + bird_radius
-    top = target_y - target_h / 2 - bird_radius
-    bottom = target_y + target_h / 2 + bird_radius
-
-    while t < max_time:
-        # Update position
-        x += vx * dt
-        y += vy * dt
-        vy += gravity * dt
-        t += dt
-
-        # Check if bird is within target bounds
-        if left <= x <= right and top <= y <= bottom:
+        # Check for target hit
+        if entities.check_target_hit(bird, target):
             return True
 
-        # If bird falls below ground, stop
-        if y > config.WINDOW_HEIGHT:
-            break
+        # Reset bird if it's moving very slowly (landed)
+        if (abs(bird.body.velocity.x) < 5 and 
+            abs(bird.body.velocity.y) < 5 and 
+            bird.body.position.x > 500):
+            return False
 
+        if (abs(bird.body.velocity.x) < 1 and   
+            abs(bird.body.velocity.y) < 1):
+                    return False
+
+        if bird.body.position.x > 960 or bird.body.position.x < 0:
+            return False
+
+        if bird.body.position.y > 900:
+            return False
+
+        if bird.body.position.y < 0:
+            return False
+    
     return False
 
 # Monte Carlo parameters
-N_SAMPLES = 200
 
-def suggest_best_shot() -> ShotSuggestion:
-    best_score = -1
-    best_angle = None
-    best_force = None
-
-    # Use config values
-    start_pos = (config.BIRD_START_X, config.BIRD_START_Y)
-    target_pos = (config.TARGET_X, config.TARGET_Y)
-    target_size = (config.TARGET_WIDTH, config.TARGET_HEIGHT)
-    bird_radius = config.BIRD_RADIUS
-    gravity = config.GRAVITY
-
-    # Reasonable ranges for angle and force
-    angle_min, angle_max = 10, 80
-    force_min, force_max = 300, 1200
+def suggest_best_shot(angle_min=10, angle_max=80, impulse_min=100, impulse_max=1200, N_SAMPLES = 200, plot=False):   
 
     results = []
 
     for _ in range(N_SAMPLES):
+        # Simple progress bar
+        bar_length = 30
+        progress = (_ + 1) / N_SAMPLES
+        filled_length = int(bar_length * progress)
+        bar = '=' * filled_length + '-' * (bar_length - filled_length)
+        print(f"\rSimulation Progress: |{bar}| {(_ + 1)}/{N_SAMPLES}", end='', flush=True)
+        if _ + 1 == N_SAMPLES:
+            print()  # Newline at end
         angle = random.uniform(angle_min, angle_max)
-        force = random.uniform(force_min, force_max)
+        impulse_magnitude = random.uniform(impulse_min, impulse_max)
         hit = _simulate_shot(
-            angle, force, start_pos, target_pos, target_size, bird_radius, gravity
+            angle, impulse_magnitude
         )
-        if hit:
-            # Prefer lower force (more efficient) and angle closer to 45
-            score = 1000 - abs(angle - 45) - 0.1 * force
-            results.append((score, angle, force))
-
+        results.append((hit, angle, impulse_magnitude))
+    
+    # Create scatter plot if requested
+    if plot and results:
+        angles = [result[1] for result in results]
+        impulses = [result[2] for result in results]
+        hits = [result[0] for result in results]
+        
+        # Separate hits and misses
+        hit_angles = [angle for angle, hit in zip(angles, hits) if hit]
+        hit_impulses = [impulse for impulse, hit in zip(impulses, hits) if hit]
+        miss_angles = [angle for angle, hit in zip(angles, hits) if not hit]
+        miss_impulses = [impulse for impulse, hit in zip(impulses, hits) if not hit]
+        
+        plt.figure(figsize=(10, 6))
+        plt.scatter(hit_angles, hit_impulses, color='blue', alpha=0.6, label='Hit', s=30)
+        plt.scatter(miss_angles, miss_impulses, color='red', alpha=0.6, label='Miss', s=30)
+        plt.xlabel('Angle (degrees)')
+        plt.ylabel('Impulse Magnitude')
+        plt.title('Shot Results: Angle vs Impulse Magnitude')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.show()
+            
     if results:
-        # Pick the best scoring shot
-        results.sort(reverse=True)
-        _, best_angle, best_force = results[0]
-    else:
-        # Fallback to default
-        best_angle = 45.0
-        best_force = 600.0
+        # Pick the last result where hit=True
+        for hit, angle, impulse_magnitude in reversed(results):
+            if hit:
+                best_angle = angle
+                best_impulse_magnitude = impulse_magnitude
+                return ShotSuggestion(angle_deg=best_angle, impulse_magnitude=best_impulse_magnitude)
+        else:
+            print("No result found")
+            return None
 
-    return ShotSuggestion(angle_deg=best_angle, force=best_force)
-      
-# print(suggest_best_shot())
+    

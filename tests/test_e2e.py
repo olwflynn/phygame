@@ -13,7 +13,7 @@ class TestE2E:
         """Test that the game can be initialized without errors"""
         # This test just ensures we can import the main module
         # and that basic game objects can be created
-        from game.physics import create_world
+        from game.entities import create_world
         from game.entities import create_ground, create_target
         
         space = create_world((0, 900))

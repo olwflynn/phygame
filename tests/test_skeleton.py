@@ -9,4 +9,4 @@ def test_imports():
     assert hasattr(entities, 'create_bird')
     
     physics = importlib.import_module("src.game.physics")
-    assert hasattr(physics, 'create_world')
+    assert hasattr(physics, 'calculate_launch_parameters')

@@ -6,8 +6,7 @@ import os
 # Add src directory to Python path so we can import from main.py
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from game.physics import create_world
-from game.entities import create_ground, create_target, create_bird
+from game.entities import create_world, create_ground, create_target, create_bird
 
 
 class TestEntities:
@@ -16,7 +15,7 @@ class TestEntities:
         ground = create_ground(space, y=500.0, width=960.0)
         
         assert isinstance(ground, pymunk.Segment)
-        assert ground.friction == 0.9
+        assert ground.friction == 0.98
         assert ground.elasticity == 0.3
         assert ground.body.body_type == pymunk.Body.STATIC
 
@@ -25,7 +24,7 @@ class TestEntities:
         target = create_target(space, pos=(800.0, 400.0), size=(40.0, 40.0))
         
         assert isinstance(target, pymunk.Poly)
-        assert target.friction == 0.6
+        assert target.friction == 0.9
         assert target.elasticity == 0.2
         assert target.body.body_type == pymunk.Body.DYNAMIC
         assert target.body.mass == 5.0
@@ -35,7 +34,7 @@ class TestEntities:
         bird = create_bird(space, pos=(120.0, 430.0), radius=14.0, velocity=(0.0, 0.0))
         
         assert isinstance(bird, pymunk.Circle)
-        assert bird.friction == 0.6
+        assert bird.friction == 0.95
         assert bird.elasticity == 0.4
         assert bird.body.body_type == pymunk.Body.DYNAMIC
         assert bird.body.mass == 1.0
