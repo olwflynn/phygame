@@ -16,7 +16,6 @@ def calculate_launch_parameters(start_pos: Tuple[int, int], end_pos: Tuple[int, 
     # Calculate launch direction: from start to end (opposite of current)
     dx = start_pos[0] - end_pos[0]  # Reverse X direction (left drag = right launch)
     dy = start_pos[1] - end_pos[1]  # Reverse Y direction (up drag = down launch)
-    velocity = (dx * velocity_multiplier, dy * velocity_multiplier)
     
     # Calculate shot parameters
     drag_distance = math.sqrt(dx**2 + dy**2) / 2
@@ -24,6 +23,11 @@ def calculate_launch_parameters(start_pos: Tuple[int, int], end_pos: Tuple[int, 
     angle_rad = math.atan2(-dy, dx)  # Calculate angle (negative dy because y increases downward)
     angle_deg = math.degrees(angle_rad)
     
+    # Calculate velocity using the same method as AI simulation
+    vx = impulse_magnitude * math.cos(angle_rad)
+    vy = -impulse_magnitude * math.sin(angle_rad)  # Negative because y increases downward in screen coordinates
+    velocity = (vx, vy)
+
     return velocity, impulse_magnitude, angle_deg, drag_distance
 
 

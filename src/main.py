@@ -8,12 +8,13 @@ import math
 from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from .game.entities import create_ground, create_target, create_bird, create_world, check_target_hit
+from .game.entities import create_ground, create_bird, create_world, check_target_hit
 from .game.ai import suggest_best_shot, ShotSuggestion
 from .game.ui import update_charts, create_shot_table, render_game
 from .game.game_state import reset_bird, reset_target, reset_game, create_shot_data, update_shot_data, finalize_shot_data
 from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds
-
+from .game.levels import load_level
+from typing import Optional, Tuple
 
 def main() -> None:
     pygame.init()
@@ -29,9 +30,11 @@ def main() -> None:
         # Create physics world and entities
         space = create_world((0, 900))  # Gravity: 900 pixels/s² downward
         ground = create_ground(space, y=500, width=960)  # Ground at y=500, spans full width
-        target = create_target(space, pos=(800, 400), size=(40, 40))  # Target at (800, 400)
+        targets, obstacles = load_level(space)
+        target = targets[0]
+        # target = create_target(space, pos=(800, 400), size=(40, 40))  # Target at (800, 400)
         bird = create_bird(space, pos=(120, 430), radius=14, velocity=(0,0))  # Bird at (120, 430)
-        velocity_multiplier = 3
+        velocity_multiplier = 5
         
         # Game state
         running = True
@@ -40,6 +43,7 @@ def main() -> None:
         score = 0
         shots_fired = 0
         max_shots = 3
+        episode_over = False  # Track if episode is actually over
 
         # Chart management
         show_charts = False  # Start with charts hidden
@@ -80,7 +84,7 @@ def main() -> None:
                     running = False
                 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if shots_fired < max_shots and bird.body.position.x < 500:
+                    if shots_fired < max_shots and bird.body.position.x < 500 and not episode_over:
                         start_pos = pygame.mouse.get_pos()
                         launching = True
                         # Start tracking shot data
@@ -107,6 +111,7 @@ def main() -> None:
                         bird = reset_game(bird, target, space)
                         score = 0
                         shots_fired = 0
+                        episode_over = False  # Reset episode state
                         # Clear chart data on reset
                         time_data.clear()
                         x_pos_data.clear()
@@ -145,7 +150,7 @@ def main() -> None:
                         if not show_suggestion:
                             # Get AI suggestion
                             try:
-                                current_suggestion = suggest_best_shot(plot=True)
+                                current_suggestion = suggest_best_shot(space, plot=True)
                                 show_suggestion = True
                             except Exception as e:
                                 print(f"Error getting AI suggestion: {e}")
@@ -188,17 +193,21 @@ def main() -> None:
                 reset_target(target)
                 bird = reset_bird(space, bird)
                 shots_fired = 0  # Reset shots for new target
+                episode_over = False  # Reset episode state
 
             # Reset bird if it's moving very slowly (landed)
             if (is_bird_landed((bird_vel.x, bird_vel.y)) and 
-                shots_fired > 0 and
-                bird.body.position.x > 500):
+                bird.body.position.x > 150):
                 # Finalize shot data if bird landed without hitting target
                 if current_shot_data and not current_shot_data.get('hit_target', False):
                     current_shot_data = finalize_shot_data(current_shot_data, False)
                     shot_history.append(current_shot_data.copy())
                     current_shot_data = {}
-                bird = reset_bird(space, bird)                
+                bird = reset_bird(space, bird)
+                
+                # Check if episode is over (all shots fired and current shot finished)
+                if shots_fired >= max_shots:
+                    episode_over = True
 
             # Reset bird if it goes out of bounds
             if is_bird_out_of_bounds((bird_pos.x, bird_pos.y)):
@@ -207,9 +216,13 @@ def main() -> None:
                     shot_history.append(current_shot_data.copy())
                     current_shot_data = {}
                 bird = reset_bird(space, bird)
+                
+                # Check if episode is over (all shots fired and current shot finished)
+                if shots_fired >= max_shots:
+                    episode_over = True
 
             # Render everything
-            render_game(screen, space, bird, target, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font)
+            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over)
 
             pygame.display.flip()
             clock.tick(60)

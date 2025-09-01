@@ -112,11 +112,12 @@ def create_shot_table(shot_history: List[Dict[str, Any]]) -> Optional[plt.Figure
     return fig
 
 
-def render_game(screen: pygame.Surface, space, bird, target, launching: bool, 
+def render_game(screen: pygame.Surface, space, bird, target, obstacles, launching: bool, 
                 start_pos: Optional[Tuple[int, int]], velocity_multiplier: float, 
                 score: int, shots_fired: int, max_shots: int, font: pygame.font.Font, 
                 width: int, height: int, show_charts: bool, show_table: bool, 
-                show_suggestion: bool, current_suggestion, suggestion_font: pygame.font.Font) -> None:
+                show_suggestion: bool, current_suggestion, suggestion_font: pygame.font.Font,
+                episode_over: bool = False) -> None:
     """Render the entire game"""
     # Draw solid light blue background
     screen.fill((173, 216, 230))
@@ -159,6 +160,16 @@ def render_game(screen: pygame.Surface, space, bird, target, launching: bool,
     pygame.draw.circle(screen, (255, 165, 0), (int(bird_pos.x), int(bird_pos.y)), 14)  # Orange bird
     pygame.draw.circle(screen, (255, 69, 0), (int(bird_pos.x), int(bird_pos.y)), 14, 2)  # Red border
     
+    # Draw obstacles
+    for obstacle, size in obstacles:
+        obstacle_width, obstacle_height = size
+        obstacle_pos = obstacle.body.position
+
+        # Calculate top-left corner (body position is center)
+        top_left_x = int(obstacle_pos.x - obstacle_width/2)
+        top_left_y = int(obstacle_pos.y - obstacle_height/2)
+        pygame.draw.rect(screen, (100, 100, 100), (top_left_x, top_left_y, int(obstacle_width), int(obstacle_height)))
+
     # Draw launch line while dragging
     if launching and start_pos:
         current_pos = pygame.mouse.get_pos()
@@ -242,7 +253,7 @@ def render_game(screen: pygame.Surface, space, bird, target, launching: bool,
         instruction_text = suggestion_font.render("Press S again to close", True, (255, 255, 255))
         screen.blit(instruction_text, (width//2 - 120, height//2 + 30))
 
-    # Game over message
-    if shots_fired >= max_shots:
+    # Game over message - only show when episode is actually over
+    if episode_over:
         game_over_text = font.render("Game Over! Press R to restart", True, (255, 0, 0))
         screen.blit(game_over_text, (width//2 - 150, height//2))

@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import Tuple
 import math, random
+from . import physics
 import matplotlib.pyplot as plt
+from pymunk import Space, Body, Poly, Segment
 
 from . import config
 from . import entities
@@ -11,58 +13,72 @@ class ShotSuggestion:
     angle_deg: float
     impulse_magnitude: float
 
-def _simulate_shot(angle_deg, impulse_magnitude):
+def _simulate_shot(space, angle_deg, impulse_magnitude):
     """
     Simulate a shot with given angle and impulse magnitude.
     Returns True if the bird hits the target bounding box.
+    Uses the current space configuration including obstacles.
     """
-     # Create physics world and entities
-    space = entities.create_world((0, 900))  # Gravity: 900 pixels/s² downward
-    ground = entities.create_ground(space, y=500, width=960)  # Target starts on the ground
-    target = entities.create_target(space, pos=(800, 480), size=(40, 40))  # Target starts on the ground
-    bird = entities.create_bird(space, pos=(120, 485), radius=14, velocity=(0,0))  # Bird starts on the ground
+    # Create a new space for simulation with the same gravity
+    sim_space = entities.create_world(space.gravity)
     
+    # Copy the ground
+    sim_ground = entities.create_ground(sim_space, y=500, width=960)
+    
+    # Copy the target
+    sim_target = entities.create_target(sim_space, pos=(800, 480), size=(40, 40))
+    
+    # Copy all obstacles from the original space
+    for body in space.bodies:
+        if body.body_type == Body.STATIC and body != space.static_body:
+            # This is an obstacle
+            for shape in body.shapes:
+                if isinstance(shape, Poly):
+                    # Create a copy of the obstacle
+                    obstacle_body = Body(body_type=Body.STATIC)
+                    obstacle_body.position = body.position
+                # Copy the vertices directly from the original shape
+                    vertices = shape.get_vertices()
+                    obstacle_shape = Poly(obstacle_body, vertices)
+                    obstacle_shape.friction = shape.friction
+                    obstacle_shape.elasticity = shape.elasticity
+                    sim_space.add(obstacle_body, obstacle_shape)
+    
+    # Create a simulation bird
+    sim_bird = entities.create_bird(sim_space, pos=(120, 485), radius=14, velocity=(0,0))
     
     # Convert angle_deg and impulse_magnitude into velocity vector
     angle_rad = math.radians(angle_deg)
     vx = impulse_magnitude * math.cos(angle_rad)
     vy = -impulse_magnitude * math.sin(angle_rad)  # Negative because y increases downward in screen coordinates
     velocity = (vx, vy)
-    bird.body.apply_impulse_at_local_point(velocity)
+    sim_bird.body.apply_impulse_at_local_point(velocity)
 
     running = True
     while running:
-    
-        space.step(1/60)
+        sim_space.step(1/60)
+
+        bird_vel = sim_bird.body.velocity
+        bird_pos = sim_bird.body.position
 
         # Check for target hit
-        if entities.check_target_hit(bird, target):
+        if entities.check_target_hit(sim_bird, sim_target):
             return True
 
-        # Reset bird if it's moving very slowly (landed)
-        if (abs(bird.body.velocity.x) < 5 and 
-            abs(bird.body.velocity.y) < 5 and 
-            bird.body.position.x > 500):
+         # Reset bird if it's moving very slowly (landed)
+        if (physics.is_bird_landed((bird_vel.x, bird_vel.y)) and 
+            bird_pos.x > 150):
             return False
 
-        if (abs(bird.body.velocity.x) < 1 and   
-            abs(bird.body.velocity.y) < 1):
-                    return False
-
-        if bird.body.position.x > 960 or bird.body.position.x < 0:
-            return False
-
-        if bird.body.position.y > 900:
-            return False
-
-        if bird.body.position.y < 0:
+        # Reset bird if it goes out of bounds
+        if physics.is_bird_out_of_bounds((bird_pos.x, bird_pos.y)):
             return False
     
     return False
 
 # Monte Carlo parameters
 
-def suggest_best_shot(angle_min=10, angle_max=80, impulse_min=100, impulse_max=1200, N_SAMPLES = 200, plot=False):   
+def suggest_best_shot(space, angle_min=0, angle_max=90, impulse_min=100, impulse_max=1200, N_SAMPLES = 1000, plot=False):   
 
     results = []
 
@@ -78,7 +94,7 @@ def suggest_best_shot(angle_min=10, angle_max=80, impulse_min=100, impulse_max=1
         angle = random.uniform(angle_min, angle_max)
         impulse_magnitude = random.uniform(impulse_min, impulse_max)
         hit = _simulate_shot(
-            angle, impulse_magnitude
+            space, angle, impulse_magnitude
         )
         results.append((hit, angle, impulse_magnitude))
     
