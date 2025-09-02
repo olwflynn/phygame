@@ -27,7 +27,7 @@ class TestGameLogic:
         
         # Import and test reset function
         from game.game_state import reset_bird
-        new_bird = reset_bird(self.space, self.bird)
+        new_bird = reset_bird(self.space, self.bird, (120, 430))
         
         # Check new bird is at starting position
         assert new_bird.body.position.x == 120
@@ -52,14 +52,14 @@ class TestGameLogic:
         
         # Import and test reset function
         from game.game_state import reset_target
-        reset_target(self.target)
+        new_target = reset_target(self.space, self.target, (800, 400))
         
         # Check target is reset to starting position
-        assert self.target.body.position.x == 800
-        assert self.target.body.position.y == 400
-        assert self.target.body.velocity.x == 0
-        assert self.target.body.velocity.y == 0
-        assert self.target.body.angular_velocity == 0
+        assert new_target.body.position.x == 800
+        assert new_target.body.position.y == 400
+        assert new_target.body.velocity.x == 0
+        assert new_target.body.velocity.y == 0
+        assert new_target.body.angular_velocity == 0
     
     def test_reset_game(self):
         """Test reset_game function resets both bird and target"""
@@ -67,17 +67,18 @@ class TestGameLogic:
         self.bird.body.position = (500, 300)
         self.target.body.position = (600, 300)
         
-        # Import and test reset function
-        from game.game_state import reset_game
-        new_bird = reset_game(self.bird, self.target, self.space)
+        # Import and test reset functions
+        from game.game_state import reset_bird, reset_target
+        new_bird = reset_bird(self.space, self.bird, (120, 430))
+        new_target = reset_target(self.space, self.target, (800, 400))
         
         # Check bird is reset
         assert new_bird.body.position.x == 120
         assert new_bird.body.position.y == 430
         
         # Check target is reset
-        assert self.target.body.position.x == 800
-        assert self.target.body.position.y == 400
+        assert new_target.body.position.x == 800
+        assert new_target.body.position.y == 400
     
     def test_check_target_hit_when_hit(self):
         """Test collision detection when bird hits target"""
@@ -131,7 +132,7 @@ class TestGameLogic:
             self.bird.body.position.x > 500):
             
             from game.game_state import reset_bird
-            new_bird = reset_bird(self.space, self.bird)
+            new_bird = reset_bird(self.space, self.bird, (120, 430))
             
             # Check bird is reset to starting position
             assert new_bird.body.position.x == 120
@@ -145,7 +146,7 @@ class TestGameLogic:
         # Simulate the out-of-bounds reset logic
         if self.bird.body.position.x < 100:
             from game.game_state import reset_bird
-            new_bird = reset_bird(self.space, self.bird)
+            new_bird = reset_bird(self.space, self.bird, (120, 430))
             assert new_bird.body.position.x == 120
             
             # Update self.bird reference for next test
@@ -156,7 +157,7 @@ class TestGameLogic:
         
         if self.bird.body.position.x > 960:
             from game.game_state import reset_bird
-            new_bird = reset_bird(self.space, self.bird)
+            new_bird = reset_bird(self.space, self.bird, (120, 430))
             assert new_bird.body.position.x == 120
     
     def test_bird_not_reset_when_moving(self):

@@ -21,13 +21,6 @@ def reset_target(space: pymunk.Space, target: pymunk.Poly, pos: Tuple[int, int])
     return target
 
 
-def reset_game(bird: pymunk.Circle, target: pymunk.Poly, space: pymunk.Space) -> pymunk.Circle:
-    """Reset entire game state"""
-    bird = reset_bird(space, bird)
-    target = reset_target(target)
-    return bird, target
-
-
 def create_shot_data(shot_number: int, start_time: float, start_pos: Tuple[int, int]) -> Dict[str, Any]:
     """Create initial shot data dictionary"""
     return {

@@ -2,9 +2,13 @@ import json
 import pymunk
 import openai
 import os
+from dotenv import load_dotenv
 from typing import List, Tuple, Dict, Any, Optional, Union
 
 from .game_state import reset_bird, reset_target
+
+# Load environment variables from .env file
+load_dotenv()
 
 def generate_level_with_llm() -> Dict[str, Any]:
     """Generate a new level using OpenAI's GPT model"""

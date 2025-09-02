@@ -11,7 +11,7 @@ from matplotlib.animation import FuncAnimation
 from .game.entities import create_ground, create_bird, create_world, check_target_hit
 from .game.ai import suggest_best_shot, ShotSuggestion
 from .game.ui import update_charts, create_shot_table, render_game
-from .game.game_state import reset_bird, reset_target, reset_game, create_shot_data, update_shot_data, finalize_shot_data
+from .game.game_state import reset_bird, reset_target, create_shot_data, update_shot_data, finalize_shot_data
 from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds
 from .game.levels import load_level, load_next_level, load_custom_level, load_predefined_level, PREDEFINED_LEVELS
 from typing import Optional, Tuple

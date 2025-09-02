@@ -2,11 +2,13 @@ import pytest
 import pymunk
 import sys
 import os
+import time
 
 # Add src directory to Python path so we can import from main.py
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from game.entities import create_world, create_ground, create_target, create_bird
+from game.game_state import create_shot_data, update_shot_data, finalize_shot_data
 
 
 class TestGameState:
@@ -182,3 +184,119 @@ class TestGameState:
         # Check that new game can start
         can_fire = shots_fired < 3  # max_shots
         assert can_fire is True
+
+    def test_create_shot_data(self):
+        """Test creating initial shot data"""
+        shot_number = 1
+        start_time = time.time()
+        start_pos = (120, 430)
+        
+        shot_data = create_shot_data(shot_number, start_time, start_pos)
+        
+        assert shot_data['shot_number'] == 1
+        assert shot_data['start_time'] == start_time
+        assert shot_data['start_pos'] == start_pos
+        assert len(shot_data) == 3  # Only initial fields
+
+    def test_update_shot_data(self):
+        """Test updating shot data with launch information"""
+        # Create initial shot data
+        shot_data = create_shot_data(1, time.time(), (120, 430))
+        
+        # Update with launch information
+        end_pos = (200, 400)
+        velocity = (150.0, -200.0)
+        impulse_magnitude = 250.0
+        angle_deg = 45.0
+        drag_distance = 100.0
+        
+        updated_data = update_shot_data(
+            shot_data, end_pos, velocity, impulse_magnitude, angle_deg, drag_distance
+        )
+        
+        # Check all fields are present
+        assert updated_data['shot_number'] == 1
+        assert updated_data['start_time'] == shot_data['start_time']
+        assert updated_data['start_pos'] == (120, 430)
+        assert updated_data['end_pos'] == end_pos
+        assert updated_data['velocity'] == velocity
+        assert updated_data['impulse_magnitude'] == impulse_magnitude
+        assert updated_data['angle_deg'] == angle_deg
+        assert updated_data['drag_distance'] == drag_distance
+        assert updated_data['hit_target'] == False  # Default value
+
+    def test_finalize_shot_data_hit(self):
+        """Test finalizing shot data when target is hit"""
+        # Create and update shot data
+        shot_data = create_shot_data(1, time.time(), (120, 430))
+        shot_data = update_shot_data(shot_data, (200, 400), (150.0, -200.0), 250.0, 45.0, 100.0)
+        
+        # Finalize with hit
+        finalized_data = finalize_shot_data(shot_data, True)
+        
+        assert finalized_data['hit_target'] == True
+        assert finalized_data['shot_number'] == 1
+        assert finalized_data['angle_deg'] == 45.0
+
+    def test_finalize_shot_data_miss(self):
+        """Test finalizing shot data when target is missed"""
+        # Create and update shot data
+        shot_data = create_shot_data(2, time.time(), (120, 430))
+        shot_data = update_shot_data(shot_data, (300, 500), (100.0, 50.0), 200.0, 30.0, 80.0)
+        
+        # Finalize with miss
+        finalized_data = finalize_shot_data(shot_data, False)
+        
+        assert finalized_data['hit_target'] == False
+        assert finalized_data['shot_number'] == 2
+        assert finalized_data['angle_deg'] == 30.0
+
+    def test_shot_data_workflow(self):
+        """Test complete shot data workflow from creation to finalization"""
+        # Step 1: Create initial shot data
+        shot_data = create_shot_data(1, time.time(), (120, 430))
+        assert 'hit_target' not in shot_data
+        
+        # Step 2: Update with launch data
+        shot_data = update_shot_data(shot_data, (250, 350), (200.0, -150.0), 300.0, 37.0, 120.0)
+        assert shot_data['hit_target'] == False
+        assert shot_data['velocity'] == (200.0, -150.0)
+        
+        # Step 3: Finalize with result
+        shot_data = finalize_shot_data(shot_data, True)
+        assert shot_data['hit_target'] == True
+        
+        # Verify all data is preserved
+        assert shot_data['shot_number'] == 1
+        assert shot_data['start_pos'] == (120, 430)
+        assert shot_data['end_pos'] == (250, 350)
+        assert shot_data['angle_deg'] == 37.0
+        assert shot_data['impulse_magnitude'] == 300.0
+
+    def test_multiple_shots_data(self):
+        """Test managing data for multiple shots"""
+        shot_history = []
+        
+        # Shot 1 - Miss
+        shot1 = create_shot_data(1, time.time(), (120, 430))
+        shot1 = update_shot_data(shot1, (200, 400), (100.0, -100.0), 200.0, 45.0, 80.0)
+        shot1 = finalize_shot_data(shot1, False)
+        shot_history.append(shot1)
+        
+        # Shot 2 - Hit
+        shot2 = create_shot_data(2, time.time(), (120, 430))
+        shot2 = update_shot_data(shot2, (250, 350), (150.0, -200.0), 300.0, 53.0, 120.0)
+        shot2 = finalize_shot_data(shot2, True)
+        shot_history.append(shot2)
+        
+        # Verify shot history
+        assert len(shot_history) == 2
+        assert shot_history[0]['shot_number'] == 1
+        assert shot_history[0]['hit_target'] == False
+        assert shot_history[1]['shot_number'] == 2
+        assert shot_history[1]['hit_target'] == True
+        
+        # Verify statistics
+        hits = sum(1 for shot in shot_history if shot['hit_target'])
+        assert hits == 1
+        assert len(shot_history) == 2
