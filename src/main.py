@@ -13,7 +13,7 @@ from .game.ai import suggest_best_shot, ShotSuggestion
 from .game.ui import update_charts, create_shot_table, render_game
 from .game.game_state import reset_bird, reset_target, reset_game, create_shot_data, update_shot_data, finalize_shot_data
 from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds
-from .game.levels import load_level
+from .game.levels import load_level, load_next_level, load_custom_level, load_predefined_level, PREDEFINED_LEVELS
 from typing import Optional, Tuple
 
 def main() -> None:
@@ -30,11 +30,16 @@ def main() -> None:
         # Create physics world and entities
         space = create_world((0, 900))  # Gravity: 900 pixels/s² downward
         ground = create_ground(space, y=500, width=960)  # Ground at y=500, spans full width
-        targets, obstacles = load_level(space)
+        
+        # Game state
+        level_number = 1
+        use_llm_for_levels = True  # Toggle between LLM and predefined levels
+        current_level_type = "LLM"  # Track current level type
+        bird, targets, obstacles = load_level(space, use_llm=use_llm_for_levels)
         target = targets[0]
-        # target = create_target(space, pos=(800, 400), size=(40, 40))  # Target at (800, 400)
-        bird = create_bird(space, pos=(120, 430), radius=14, velocity=(0,0))  # Bird at (120, 430)
         velocity_multiplier = 5
+        bird_start_pos = bird.body.position
+        target_start_pos = target.body.position
         
         # Game state
         running = True
@@ -108,7 +113,8 @@ def main() -> None:
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:  # Reset button
-                        bird = reset_game(bird, target, space)
+                        bird = reset_bird(space, bird, bird_start_pos)
+                        target = reset_target(space, target, target_start_pos)
                         score = 0
                         shots_fired = 0
                         episode_over = False  # Reset episode state
@@ -118,6 +124,38 @@ def main() -> None:
                         y_pos_data.clear()
                         x_vel_data.clear()
                         y_vel_data.clear()
+                    elif event.key == pygame.K_n:  # Next level button
+                        try:
+                            # Generate and load new level
+                            bird, targets, obstacles = load_next_level(space, use_llm=use_llm_for_levels, prev_bird=bird, prev_target=target)
+                            target = targets[0]
+                            
+                            bird_start_pos = bird.body.position
+                            target_start_pos = target.body.position
+                            
+                            # Reset game state for new level
+                            score = 0
+                            shots_fired = 0
+                            episode_over = False
+                            level_number += 1
+                            
+                            # Clear chart data for new level
+                            time_data.clear()
+                            x_pos_data.clear()
+                            y_pos_data.clear()
+                            x_vel_data.clear()
+                            y_vel_data.clear()
+                            
+                            # Clear shot history for new level
+                            shot_history.clear()
+                            
+                            print(f"Loaded level {level_number} ({current_level_type})")
+                        except Exception as e:
+                            print(f"Error loading next level: {e}")
+                    elif event.key == pygame.K_l:  # Toggle level generation method
+                        use_llm_for_levels = not use_llm_for_levels
+                        current_level_type = "LLM" if use_llm_for_levels else "Predefined"
+                        print(f"Level generation switched to: {current_level_type}")
                     elif event.key == pygame.K_c:  # Toggle charts
                         show_charts = not show_charts
                         if show_charts and not chart_window_open:
@@ -190,8 +228,8 @@ def main() -> None:
                     if show_table and table_window_open and table_fig:
                         plt.close(table_fig)
                         table_fig = create_shot_table(shot_history)
-                reset_target(target)
-                bird = reset_bird(space, bird)
+                target = reset_target(space, target, target_start_pos)
+                bird = reset_bird(space, bird, bird_start_pos)
                 shots_fired = 0  # Reset shots for new target
                 episode_over = False  # Reset episode state
 
@@ -203,7 +241,7 @@ def main() -> None:
                     current_shot_data = finalize_shot_data(current_shot_data, False)
                     shot_history.append(current_shot_data.copy())
                     current_shot_data = {}
-                bird = reset_bird(space, bird)
+                bird = reset_bird(space, bird, bird_start_pos)
                 
                 # Check if episode is over (all shots fired and current shot finished)
                 if shots_fired >= max_shots:
@@ -215,14 +253,14 @@ def main() -> None:
                     current_shot_data = finalize_shot_data(current_shot_data, False)
                     shot_history.append(current_shot_data.copy())
                     current_shot_data = {}
-                bird = reset_bird(space, bird)
+                bird = reset_bird(space, bird, bird_start_pos)
                 
                 # Check if episode is over (all shots fired and current shot finished)
                 if shots_fired >= max_shots:
                     episode_over = True
 
             # Render everything
-            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over)
+            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type)
 
             pygame.display.flip()
             clock.tick(60)

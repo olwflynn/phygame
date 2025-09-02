@@ -117,7 +117,7 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
                 score: int, shots_fired: int, max_shots: int, font: pygame.font.Font, 
                 width: int, height: int, show_charts: bool, show_table: bool, 
                 show_suggestion: bool, current_suggestion, suggestion_font: pygame.font.Font,
-                episode_over: bool = False) -> None:
+                episode_over: bool = False, level_number: int = 1, level_type: str = "LLM") -> None:
     """Render the entire game"""
     # Draw solid light blue background
     screen.fill((173, 216, 230))
@@ -206,28 +206,40 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
     screen.blit(score_text, (20, 20))
     
+    # Level display
+    level_text = font.render(f"Level: {level_number} ({level_type})", True, (255, 255, 255))
+    screen.blit(level_text, (20, 60))
+    
     # Shots remaining
     shots_text = font.render(f"Shots: {max_shots - shots_fired}/{max_shots}", True, (255, 255, 255))
-    screen.blit(shots_text, (20, 60))
+    screen.blit(shots_text, (20, 100))
     
     # Reset button
     reset_text = font.render("Press R to Reset", True, (255, 0, 0))
-    screen.blit(reset_text, (20, 100))
+    screen.blit(reset_text, (20, 140))
+    
+    # Next level button
+    next_level_text = font.render("Press N for Next Level", True, (0, 255, 255))
+    screen.blit(next_level_text, (20, 180))
+    
+    # Level generation toggle
+    level_gen_text = font.render(f"Press L to toggle: {level_type}", True, (255, 255, 0))
+    screen.blit(level_gen_text, (20, 220))
     
     # Chart toggle indicator
     chart_status = "ON" if show_charts else "OFF"
     chart_text = font.render(f"Charts: {chart_status} (Press C to toggle)", True, (0, 255, 0) if show_charts else (255, 0, 0))
-    screen.blit(chart_text, (20, 140))
+    screen.blit(chart_text, (20, 260))
 
     # Table toggle indicator
     table_status = "ON" if show_table else "OFF"
     table_text = font.render(f"Table: {table_status} (Press T to toggle)", True, (0, 255, 0) if show_table else (255, 0, 0))
-    screen.blit(table_text, (20, 180))
+    screen.blit(table_text, (20, 300))
 
     # Suggest best shot toggle indicator
     suggestion_status = "ON" if show_suggestion else "OFF"
     suggestion_text = font.render(f"AI Suggestion: {suggestion_status} (Press S to toggle)", True, (0, 255, 0) if show_suggestion else (255, 0, 0))
-    screen.blit(suggestion_text, (20, 220))
+    screen.blit(suggestion_text, (20, 340))
 
     # Display AI suggestion if active
     if show_suggestion and current_suggestion:
