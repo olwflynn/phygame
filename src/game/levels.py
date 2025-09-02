@@ -58,7 +58,7 @@ def generate_level_with_llm() -> Dict[str, Any]:
             temperature=0.7,
             max_tokens=500
         )
-        
+        print(response.choices[0].message.content)
         # Extract JSON from response
         level_json = response.choices[0].message.content.strip()
         
@@ -135,6 +135,8 @@ def load_level(space, level_data: Optional[Union[Dict[str, Any], str]] = None, u
     # Only remove obstacles (STATIC bodies that are not the static_body)
     for body in space.bodies[:]:  # Copy list to avoid modification during iteration
         if body != space.static_body and body.body_type == pymunk.Body.STATIC:
+            for shape in body.shapes:
+                space.remove(shape)
             space.remove(body)
 
     bird = reset_bird(space, prev_bird, (120, 430))

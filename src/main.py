@@ -9,9 +9,9 @@ from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from .game.entities import create_ground, create_bird, create_world, check_target_hit
-from .game.ai import suggest_best_shot, ShotSuggestion
+from .game.ai import suggest_best_shot, ShotSuggestion, SimulationState, start_ai_simulation, update_ai_simulation, stop_ai_simulation
 from .game.ui import update_charts, create_shot_table, render_game
-from .game.game_state import reset_bird, reset_target, create_shot_data, update_shot_data, finalize_shot_data
+from .game.game_state import reset_bird, reset_target, create_shot_data, update_shot_data, finalize_shot_data, restart_simulation
 from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds
 from .game.levels import load_level, load_next_level, load_custom_level, load_predefined_level, PREDEFINED_LEVELS
 from typing import Optional, Tuple
@@ -50,6 +50,14 @@ def main() -> None:
         max_shots = 3
         episode_over = False  # Track if episode is actually over
 
+        # UI state
+        show_settings = False  # Settings tab visibility
+
+        # AI simulation state
+        ai_sim_state = SimulationState()
+        show_suggestion = False  # Whether to show AI suggestion
+        current_suggestion = None  # Current AI suggestion
+
         # Chart management
         show_charts = False  # Start with charts hidden
         chart_window_open = False
@@ -79,8 +87,6 @@ def main() -> None:
         table_font = pygame.font.Font(None, 24)  # Smaller font for table
 
         # Suggest best shot state
-        show_suggestion = False  # Start with suggestion hidden
-        current_suggestion = None  # Current AI suggestion
         suggestion_font = pygame.font.Font(None, 28)  # Font for suggestion display
 
         while running:
@@ -89,7 +95,8 @@ def main() -> None:
                     running = False
                 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if shots_fired < max_shots and bird.body.position.x < 500 and not episode_over:
+                    # Allow mouse interactions even during AI simulation
+                    if shots_fired < max_shots and bird.body.position.x < 500 and not episode_over and not show_settings:
                         start_pos = pygame.mouse.get_pos()
                         launching = True
                         # Start tracking shot data
@@ -112,7 +119,11 @@ def main() -> None:
                     launching = False
 
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_r:  # Reset button
+                    if event.key == pygame.K_ESCAPE:  # Close settings
+                        show_settings = False
+                    elif event.key == pygame.K_TAB:  # Toggle settings
+                        show_settings = not show_settings
+                    elif event.key == pygame.K_r:  # Reset button
                         bird = reset_bird(space, bird, bird_start_pos)
                         target = reset_target(space, target, target_start_pos)
                         score = 0
@@ -129,6 +140,7 @@ def main() -> None:
                             # Generate and load new level
                             bird, targets, obstacles = load_next_level(space, use_llm=use_llm_for_levels, prev_bird=bird, prev_target=target)
                             target = targets[0]
+                            print(f"Number of bodies in space: {len(space.bodies)}")
                             
                             bird_start_pos = bird.body.position
                             target_start_pos = target.body.position
@@ -184,22 +196,42 @@ def main() -> None:
                                 plt.close(table_fig)
                                 table_window_open = False
                                 table_fig = None
-                    elif event.key == pygame.K_s:  # Toggle suggest best shot
-                        if not show_suggestion:
-                            # Get AI suggestion
-                            try:
-                                current_suggestion = suggest_best_shot(space, plot=True)
-                                show_suggestion = True
-                            except Exception as e:
-                                print(f"Error getting AI suggestion: {e}")
-                                current_suggestion = None
-                        else:
+                    elif event.key == pygame.K_s:  # Toggle AI simulation
+                        if not ai_sim_state.running and not show_suggestion:
+                            # Start AI simulation
+                            start_ai_simulation(space, target, ai_sim_state, plot=True)
+                            print("AI simulation started")
+                        elif ai_sim_state.running:
+                            # Stop AI simulation immediately
+                            stop_ai_simulation(ai_sim_state)
+                            print("AI simulation stopped - returning to game")
+                        elif show_suggestion:
                             # Hide suggestion
                             show_suggestion = False
                             current_suggestion = None
 
-            # Step physics simulation (60 FPS)
-            space.step(1/60)
+            # Update AI simulation
+            if ai_sim_state.running:
+                simulation_complete = update_ai_simulation(space, target, ai_sim_state, plot=True)
+                if simulation_complete:
+                    if ai_sim_state.best_suggestion and not ai_sim_state.should_stop:
+                        current_suggestion = ai_sim_state.best_suggestion
+                        show_suggestion = True
+                        print("AI simulation completed")
+                    else:
+                        print("AI simulation stopped early")
+            elif not ai_sim_state.running and ai_sim_state.current_sample > 0:
+                # Simulation was stopped, reset state to return to game
+                ai_sim_state.progress = 0.0
+                ai_sim_state.current_sample = 0
+                ai_sim_state.results = []
+                ai_sim_state.best_suggestion = None
+                ai_sim_state.should_stop = False
+                print("AI simulation state reset - back to game")
+
+            # Step physics simulation (60 FPS) - only if not in settings
+            if not show_settings:
+                space.step(1/60)
             
             # Collect data for charts
             current_time = time.time()
@@ -260,7 +292,7 @@ def main() -> None:
                     episode_over = True
 
             # Render everything
-            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type)
+            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type, show_settings, ai_sim_state.progress, ai_sim_state.current_sample, ai_sim_state.total_samples)
 
             pygame.display.flip()
             clock.tick(60)

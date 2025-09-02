@@ -112,12 +112,125 @@ def create_shot_table(shot_history: List[Dict[str, Any]]) -> Optional[plt.Figure
     return fig
 
 
+def render_settings_tab(screen: pygame.Surface, font: pygame.font.Font, small_font: pygame.font.Font, 
+                       show_charts: bool, show_table: bool, show_suggestion: bool, 
+                       level_type: str, width: int, height: int) -> None:
+    """Render the settings tab with all controls and instructions"""
+    # Create semi-transparent overlay
+    overlay = pygame.Surface((width, height))
+    overlay.set_alpha(220)
+    overlay.fill((0, 0, 0))
+    screen.blit(overlay, (0, 0))
+    
+    # Draw settings panel
+    panel_width = 600
+    panel_height = 500
+    panel_x = (width - panel_width) // 2
+    panel_y = (height - panel_height) // 2
+    
+    # Panel background
+    pygame.draw.rect(screen, (50, 50, 50), (panel_x, panel_y, panel_width, panel_height))
+    pygame.draw.rect(screen, (255, 255, 255), (panel_x, panel_y, panel_width, panel_height), 3)
+    
+    # Title
+    title_text = font.render("Settings & Controls", True, (255, 255, 255))
+    title_rect = title_text.get_rect(center=(panel_x + panel_width // 2, panel_y + 30))
+    screen.blit(title_text, title_rect)
+    
+    # Instructions
+    instructions = [
+        "GAME CONTROLS:",
+        "R - Reset current level",
+        "N - Next level",
+        "L - Toggle level generation (LLM/Predefined)",
+        "",
+        "VISUALIZATION:",
+        f"C - Toggle charts ({'ON' if show_charts else 'OFF'})",
+        f"T - Toggle shot table ({'ON' if show_table else 'OFF'})",
+        f"S - Toggle AI suggestions ({'ON' if show_suggestion else 'OFF'})",
+        "",
+        "SIMULATION:",
+        "S - Start/Stop AI simulation (shows progress)",
+        "ESC - Close settings",
+        "",
+        "CURRENT SETTINGS:",
+        f"Level Type: {level_type}",
+        f"Charts: {'Enabled' if show_charts else 'Disabled'}",
+        f"Shot Table: {'Enabled' if show_table else 'Disabled'}",
+        f"AI Suggestions: {'Enabled' if show_suggestion else 'Disabled'}"
+    ]
+    
+    y_offset = panel_y + 70
+    for instruction in instructions:
+        if instruction.startswith(("GAME CONTROLS:", "VISUALIZATION:", "SIMULATION:", "CURRENT SETTINGS:")):
+            # Section headers
+            text = small_font.render(instruction, True, (255, 255, 0))
+        elif instruction == "":
+            # Empty line
+            y_offset += 10
+            continue
+        else:
+            # Regular instructions
+            text = small_font.render(instruction, True, (255, 255, 255))
+        
+        screen.blit(text, (panel_x + 20, y_offset))
+        y_offset += 25
+
+
+def render_ai_simulation_progress_corner(screen: pygame.Surface, font: pygame.font.Font, 
+                                        sim_progress: float, current_sample: int, total_samples: int, 
+                                        width: int, height: int) -> None:
+    """Render AI simulation progress indicator in top right corner"""
+    if sim_progress > 0:
+        # Position in top right corner
+        corner_x = width - 250
+        corner_y = 20
+        
+        # Create semi-transparent background
+        bg_width = 230
+        bg_height = 120
+        bg_surface = pygame.Surface((bg_width, bg_height))
+        bg_surface.set_alpha(200)
+        bg_surface.fill((0, 0, 0))
+        screen.blit(bg_surface, (corner_x, corner_y))
+        
+        # Draw border
+        pygame.draw.rect(screen, (255, 255, 255), (corner_x, corner_y, bg_width, bg_height), 2)
+        
+        # Progress bar background
+        bar_width = 200
+        bar_height = 15
+        bar_x = corner_x + 15
+        bar_y = corner_y + 25
+        
+        pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height))
+        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)
+        
+        # Progress bar fill
+        fill_width = int(bar_width * sim_progress)
+        pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, fill_width, bar_height))
+        
+        # Progress text
+        progress_text = font.render("AI Simulation", True, (255, 255, 255))
+        screen.blit(progress_text, (bar_x, corner_y + 5))
+        
+        # Sample count text
+        sample_text = font.render(f"{current_sample}/{total_samples} ({int(sim_progress * 100)}%)", True, (255, 255, 255))
+        screen.blit(sample_text, (bar_x, bar_y + bar_height + 5))
+        
+        # Instruction text
+        instruction_text = font.render("Press S to stop", True, (255, 255, 0))
+        screen.blit(instruction_text, (bar_x, bar_y + bar_height + 25))
+
+
 def render_game(screen: pygame.Surface, space, bird, target, obstacles, launching: bool, 
                 start_pos: Optional[Tuple[int, int]], velocity_multiplier: float, 
                 score: int, shots_fired: int, max_shots: int, font: pygame.font.Font, 
                 width: int, height: int, show_charts: bool, show_table: bool, 
                 show_suggestion: bool, current_suggestion, suggestion_font: pygame.font.Font,
-                episode_over: bool = False, level_number: int = 1, level_type: str = "LLM") -> None:
+                episode_over: bool = False, level_number: int = 1, level_type: str = "LLM",
+                show_settings: bool = False, ai_sim_progress: float = 0.0, 
+                ai_current_sample: int = 0, ai_total_samples: int = 1000) -> None:
     """Render the entire game"""
     # Draw solid light blue background
     screen.fill((173, 216, 230))
@@ -201,7 +314,7 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
         text_offset = (30, -30)
         screen.blit(info_text, (current_pos[0] + text_offset[0], current_pos[1] + text_offset[1]))
 
-    # Draw UI elements
+    # Draw UI elements - Clean minimal display
     # Score display
     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
     screen.blit(score_text, (20, 20))
@@ -214,35 +327,17 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
     shots_text = font.render(f"Shots: {max_shots - shots_fired}/{max_shots}", True, (255, 255, 255))
     screen.blit(shots_text, (20, 100))
     
-    # Reset button
-    reset_text = font.render("Press R to Reset", True, (255, 0, 0))
-    screen.blit(reset_text, (20, 140))
+    # Settings button
+    settings_text = font.render("Press TAB for Settings", True, (255, 255, 0))
+    screen.blit(settings_text, (20, 140))
     
-    # Next level button
-    next_level_text = font.render("Press N for Next Level", True, (0, 255, 255))
-    screen.blit(next_level_text, (20, 180))
-    
-    # Level generation toggle
-    level_gen_text = font.render(f"Press L to toggle: {level_type}", True, (255, 255, 0))
-    screen.blit(level_gen_text, (20, 220))
-    
-    # Chart toggle indicator
-    chart_status = "ON" if show_charts else "OFF"
-    chart_text = font.render(f"Charts: {chart_status} (Press C to toggle)", True, (0, 255, 0) if show_charts else (255, 0, 0))
-    screen.blit(chart_text, (20, 260))
-
-    # Table toggle indicator
-    table_status = "ON" if show_table else "OFF"
-    table_text = font.render(f"Table: {table_status} (Press T to toggle)", True, (0, 255, 0) if show_table else (255, 0, 0))
-    screen.blit(table_text, (20, 300))
-
-    # Suggest best shot toggle indicator
-    suggestion_status = "ON" if show_suggestion else "OFF"
-    suggestion_text = font.render(f"AI Suggestion: {suggestion_status} (Press S to toggle)", True, (0, 255, 0) if show_suggestion else (255, 0, 0))
-    screen.blit(suggestion_text, (20, 340))
+    # AI simulation status (only show if not running)
+    if ai_sim_progress == 0 and show_suggestion and current_suggestion:
+        ai_status_text = font.render("AI Suggestion Available", True, (0, 255, 0))
+        screen.blit(ai_status_text, (20, 180))
 
     # Display AI suggestion if active
-    if show_suggestion and current_suggestion:
+    if show_suggestion and current_suggestion and ai_sim_progress == 0:
         # Create a semi-transparent overlay
         overlay = pygame.Surface((400, 200))
         overlay.set_alpha(200)
@@ -269,3 +364,14 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
     if episode_over:
         game_over_text = font.render("Game Over! Press R to restart", True, (255, 0, 0))
         screen.blit(game_over_text, (width//2 - 150, height//2))
+
+    # Render settings tab if active
+    if show_settings:
+        small_font = pygame.font.Font(None, 24)
+        render_settings_tab(screen, font, small_font, show_charts, show_table, 
+                           show_suggestion, level_type, width, height)
+    
+    # Render AI simulation progress in top right corner if active
+    if ai_sim_progress > 0:
+        render_ai_simulation_progress_corner(screen, font, ai_sim_progress, ai_current_sample, 
+                                            ai_total_samples, width, height)

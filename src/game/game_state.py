@@ -21,6 +21,18 @@ def reset_target(space: pymunk.Space, target: pymunk.Poly, pos: Tuple[int, int])
     return target
 
 
+def restart_simulation(space: pymunk.Space, bird: pymunk.Circle, target: pymunk.Poly, 
+                      bird_start_pos: Tuple[int, int], target_start_pos: Tuple[int, int]) -> Tuple[pymunk.Circle, pymunk.Poly]:
+    """Restart the simulation by resetting bird and target positions"""
+    # Reset bird to starting position
+    bird = reset_bird(space, bird, bird_start_pos)
+    
+    # Reset target to starting position
+    target = reset_target(space, target, target_start_pos)
+    
+    return bird, target
+
+
 def create_shot_data(shot_number: int, start_time: float, start_pos: Tuple[int, int]) -> Dict[str, Any]:
     """Create initial shot data dictionary"""
     return {
