@@ -29,8 +29,9 @@ def generate_level_with_llm() -> Dict[str, Any]:
         - Ground is at y=500
         - Target should be a house that can be hit
         - Obstacles should be rectangular blocks that can be destroyed or used as cover
-        - Maximum 5 obstacles to keep it manageable
+        - Minimum 4 and Maximum 10 obstacles
         - Target should be reachable with the given physics constraints
+        - There should be at least one obstacle on the ground (y=500) to make it challenging
         
         Return ONLY a valid JSON object with this exact structure:
         {

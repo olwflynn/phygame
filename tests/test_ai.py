@@ -56,7 +56,7 @@ class TestSimulateShot:
         angle_deg = 5.0
         impulse_magnitude = 50.0
         
-        result = _simulate_shot(self.space, angle_deg, impulse_magnitude)
+        result = _simulate_shot(self.space, self.target, angle_deg, impulse_magnitude)
         
         assert isinstance(result, bool)
         # Note: The result depends on physics simulation, so we just verify it's a boolean
@@ -74,7 +74,7 @@ class TestSimulateShot:
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = False
             
-            result = _simulate_shot(self.space, 45.0, 300.0)
+            result = _simulate_shot(self.space, self.target, 45.0, 300.0)
             
             assert isinstance(result, bool)
     
@@ -87,7 +87,7 @@ class TestSimulateShot:
         # Run simulation with mocked physics to avoid long execution
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = True
-            _simulate_shot(self.space, 45.0, 400.0)
+            _simulate_shot(self.space, self.target, 45.0, 400.0)
         
         # Original space should be unchanged
         assert len(self.space.bodies) == original_bodies_count
@@ -111,7 +111,7 @@ class TestSuggestBestShot:
         mock_simulate.side_effect = [False, False, True]
         
         # Use small sample size for faster testing
-        suggestion = suggest_best_shot(self.space, N_SAMPLES=3, plot=False)
+        suggestion = suggest_best_shot(self.space, self.target, N_SAMPLES=3, plot=False)
         
         assert suggestion is not None
         assert isinstance(suggestion, ShotSuggestion)
@@ -126,7 +126,7 @@ class TestSuggestBestShot:
         # Mock simulation to return all misses
         mock_simulate.return_value = False
         
-        suggestion = suggest_best_shot(self.space, N_SAMPLES=3, plot=False)
+        suggestion = suggest_best_shot(self.space, self.target, N_SAMPLES=3, plot=False)
         
         assert suggestion is None
     
@@ -136,7 +136,7 @@ class TestSuggestBestShot:
         # Mock simulation to return hits at specific points
         mock_simulate.side_effect = [False, True, False]
         
-        suggestion = suggest_best_shot(self.space, N_SAMPLES=3, plot=False)
+        suggestion = suggest_best_shot(self.space, self.target, N_SAMPLES=3, plot=False)
         
         assert suggestion is not None
         # Should return the last hit (3rd call)
@@ -149,6 +149,7 @@ class TestSuggestBestShot:
             
             suggestion = suggest_best_shot(
                 self.space, 
+                self.target,
                 angle_min=10, 
                 angle_max=80, 
                 impulse_min=200, 
@@ -165,7 +166,7 @@ class TestSuggestBestShot:
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = False
             
-            suggest_best_shot(self.space, N_SAMPLES=3, plot=False)
+            suggest_best_shot(self.space, self.target, N_SAMPLES=3, plot=False)
             
             # Check that progress output was printed
             captured = capsys.readouterr()
@@ -177,7 +178,7 @@ class TestSuggestBestShot:
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = True
             
-            suggestion = suggest_best_shot(self.space, N_SAMPLES=5, plot=True)
+            suggestion = suggest_best_shot(self.space, self.target, N_SAMPLES=5, plot=True)
             
             assert suggestion is not None
             # Plot should be shown
@@ -188,7 +189,7 @@ class TestSuggestBestShot:
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = False
             
-            suggestion = suggest_best_shot(self.space, N_SAMPLES=0, plot=False)
+            suggestion = suggest_best_shot(self.space, self.target, N_SAMPLES=0, plot=False)
             
             assert suggestion is None
     
@@ -203,7 +204,7 @@ class TestSuggestBestShot:
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = True
             
-            suggestion = suggest_best_shot(self.space, N_SAMPLES=5, plot=False)
+            suggestion = suggest_best_shot(self.space, self.target, N_SAMPLES=5, plot=False)
             
             assert suggestion is not None
             assert isinstance(suggestion, ShotSuggestion)
@@ -228,6 +229,7 @@ class TestAIIntegration:
             
             suggestion = suggest_best_shot(
                 self.space, 
+                self.target,
                 angle_min=30, 
                 angle_max=60, 
                 impulse_min=300, 
@@ -256,7 +258,7 @@ class TestAIIntegration:
             with patch('game.ai._simulate_shot') as mock_simulate:
                 mock_simulate.return_value = True
                 
-                suggestion = suggest_best_shot(space, N_SAMPLES=5, plot=False)
+                suggestion = suggest_best_shot(space, target, N_SAMPLES=5, plot=False)
                 
                 assert suggestion is not None
                 assert isinstance(suggestion, ShotSuggestion)

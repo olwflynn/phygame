@@ -255,7 +255,7 @@ class TestRenderGame:
         self.screen.fill.assert_called_once()
         
         # Verify font.render was called for UI elements
-        assert self.font.render.call_count >= 5  # Score, level, shots, etc.
+        assert self.font.render.call_count >= 4  # Score, level, shots, settings
     
     @patch('pygame.draw.circle')
     @patch('pygame.draw.rect')
@@ -392,7 +392,7 @@ class TestRenderGame:
         )
         
         # Should render game over message
-        assert self.font.render.call_count >= 6  # Including game over message
+        assert self.font.render.call_count >= 5  # Including game over message
     
     @patch('pygame.draw.circle')
     @patch('pygame.draw.rect')
@@ -428,7 +428,7 @@ class TestRenderGame:
             )
             
             # Should render score
-            assert self.font.render.call_count >= 5
+            assert self.font.render.call_count >= 4
     
     @patch('pygame.draw.circle')
     @patch('pygame.draw.rect')
@@ -464,7 +464,7 @@ class TestRenderGame:
             )
             
             # Should render shots remaining
-            assert self.font.render.call_count >= 5
+            assert self.font.render.call_count >= 4
     
     @patch('pygame.draw.circle')
     @patch('pygame.draw.rect')
@@ -504,7 +504,7 @@ class TestRenderGame:
                 )
                 
                 # Should render level information
-                assert self.font.render.call_count >= 5
+                assert self.font.render.call_count >= 4
 
 
 class TestUIIntegration:

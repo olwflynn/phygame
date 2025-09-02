@@ -40,7 +40,7 @@ class TestE2E:
         with patch('game.ai._simulate_shot') as mock_simulate:
             mock_simulate.return_value = True
             
-            suggestion = suggest_best_shot(space, N_SAMPLES=5, plot=False)
+            suggestion = suggest_best_shot(space, target, N_SAMPLES=5, plot=False)
             
             assert suggestion is not None
             assert hasattr(suggestion, 'angle_deg')
