@@ -9,12 +9,11 @@ from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from .game.entities import create_ground, create_bird, create_world, check_target_hit
-from .game.ai import suggest_best_shot, ShotSuggestion, SimulationState, start_ai_simulation, update_ai_simulation, stop_ai_simulation
+from .game.ai import SimulationState, start_ai_simulation, update_ai_simulation, stop_ai_simulation
 from .game.ui import update_charts, create_shot_table, render_game
 from .game.game_state import reset_bird, reset_target, create_shot_data, update_shot_data, finalize_shot_data, restart_simulation
-from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds
-from .game.levels import load_level, load_next_level, load_custom_level, load_predefined_level, PREDEFINED_LEVELS
-from typing import Optional, Tuple
+from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds, is_bird_on_ground, apply_ground_friction
+from .game.levels import load_level, load_next_level
 
 def main() -> None:
     pygame.init()
@@ -49,6 +48,8 @@ def main() -> None:
         shots_fired = 0
         max_shots = 3
         episode_over = False  # Track if episode is actually over
+        show_congrats = False  # Track if we should show congratulations message
+        congrats_timer = 0  # Timer for congratulations message
 
         # UI state
         show_settings = False  # Settings tab visibility
@@ -166,7 +167,7 @@ def main() -> None:
                             print(f"Error loading next level: {e}")
                     elif event.key == pygame.K_l:  # Toggle level generation method
                         use_llm_for_levels = not use_llm_for_levels
-                        current_level_type = "LLM" if use_llm_for_levels else "Predefined"
+                        current_level_type = "LLM" if use_llm_for_levels else "Random"
                         print(f"Level generation switched to: {current_level_type}")
                     elif event.key == pygame.K_c:  # Toggle charts
                         show_charts = not show_charts
@@ -250,6 +251,8 @@ def main() -> None:
             
             # Check for target hit
             if check_target_hit(bird, target):
+                show_congrats = True
+                congrats_timer = 60  # Show for 1 seconds at 60 FPS
                 score += 100
                 # Update shot data if we have current shot data
                 if current_shot_data:
@@ -260,10 +263,45 @@ def main() -> None:
                     if show_table and table_window_open and table_fig:
                         plt.close(table_fig)
                         table_fig = create_shot_table(shot_history)
-                target = reset_target(space, target, target_start_pos)
-                bird = reset_bird(space, bird, bird_start_pos)
-                shots_fired = 0  # Reset shots for new target
-                episode_over = False  # Reset episode state
+                
+                # Go to next level, carry score over, reset birds to max shots=3
+                try:
+                    # Generate and load new level
+                    bird, targets, obstacles = load_next_level(space, use_llm=use_llm_for_levels, prev_bird=bird, prev_target=target)
+                    target = targets[0]
+                    print(f"Number of bodies in space: {len(space.bodies)}")
+                    
+                    bird_start_pos = bird.body.position
+                    target_start_pos = target.body.position
+                    
+                    # Reset game state for new level but keep score
+                    shots_fired = 0  # Reset shots to 0, max_shots stays 3
+                    episode_over = False
+                    level_number += 1
+                    
+                    # Clear chart data for new level
+                    time_data.clear()
+                    x_pos_data.clear()
+                    y_pos_data.clear()
+                    x_vel_data.clear()
+                    y_vel_data.clear()
+                    
+                    # Clear shot history for new level
+                    shot_history.clear()
+                    
+                    print(f"Level {level_number} completed! Score: {score}. Loading next level...")
+                except Exception as e:
+                    print(f"Error loading next level: {e}")
+
+            # Apply ground friction when bird is on the floor
+            if is_bird_on_ground((bird_pos.x, bird_pos.y)):
+                apply_ground_friction(bird)
+
+            # Update congratulations timer
+            if show_congrats:
+                congrats_timer -= 1
+                if congrats_timer <= 0:
+                    show_congrats = False
 
             # Reset bird if it's moving very slowly (landed)
             if (is_bird_landed((bird_vel.x, bird_vel.y)) and 
@@ -292,7 +330,7 @@ def main() -> None:
                     episode_over = True
 
             # Render everything
-            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type, show_settings, ai_sim_state.progress, ai_sim_state.current_sample, ai_sim_state.total_samples)
+            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type, show_settings, ai_sim_state.progress, ai_sim_state.current_sample, ai_sim_state.total_samples, show_congrats)
 
             pygame.display.flip()
             clock.tick(60)

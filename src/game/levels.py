@@ -2,6 +2,7 @@ import json
 import pymunk
 import openai
 import os
+import random
 from dotenv import load_dotenv
 from typing import List, Tuple, Dict, Any, Optional, Union
 
@@ -170,78 +171,60 @@ def load_next_level(space, use_llm: bool = True, prev_bird: pymunk.Circle = None
     if use_llm:
         level_data = generate_level_with_llm()
     else:
-        level_data = get_default_level()
+        level_data = generate_random_level()
     
     return load_level(space, level_data, prev_bird=prev_bird, prev_target=prev_target)
 
-def load_custom_level(space, json_string: str):
-    """
-    Load a custom level from JSON string
+
+def generate_random_level() -> Dict[str, Any]:
+    """Generate a random level for the physics game"""
+
+    GROUND_Y = 500
     
-    Args:
-        space: Pymunk space to add objects to
-        json_string: JSON string containing level data
-    """
-    level_data = parse_level_from_json(json_string)
-    return load_level(space, level_data)
-
-
-# --- Example usage and predefined levels ---
-DEFAULT_LEVEL_JSON = """
-{
-  "targets": [
-    {"x": 800, "y": 400}
-  ],
-  "obstacles": [
-    {"x": 400, "y": 500, "w": 10, "h": 100}
-  ]
-}
-"""
-
-EASY_LEVEL_JSON = """
-{
-  "targets": [
-    {"x": 600, "y": 450}
-  ],
-  "obstacles": [
-    {"x": 400, "y": 500, "w": 10, "h": 50}
-  ]
-}
-"""
-
-HARD_LEVEL_JSON = """
-{
-  "targets": [
-    {"x": 850, "y": 350}
-  ],
-  "obstacles": [
-    {"x": 400, "y": 500, "w": 10, "h": 100},
-    {"x": 500, "y": 450, "w": 10, "h": 80},
-    {"x": 600, "y": 400, "w": 10, "h": 60},
-    {"x": 700, "y": 350, "w": 10, "h": 40},
-    {"x": 800, "y": 500, "w": 10, "h": 100}
-  ]
-}
-"""
-
-# Predefined level configurations
-PREDEFINED_LEVELS = {
-    "default": DEFAULT_LEVEL_JSON,
-    "easy": EASY_LEVEL_JSON,
-    "hard": HARD_LEVEL_JSON
-}
-
-def load_predefined_level(space, level_name: str):
-    """
-    Load a predefined level by name
+    # Target constraints (house should be reachable)
+    TARGET_MIN_X = 400
+    TARGET_MAX_X = 900
+    TARGET_MIN_Y = 300
+    TARGET_MAX_Y = 480
     
-    Args:
-        space: Pymunk space to add objects to
-        level_name: Name of predefined level ("default", "easy", "hard")
-    """
-    if level_name not in PREDEFINED_LEVELS:
-        raise ValueError(f"Unknown level name: {level_name}. Available: {list(PREDEFINED_LEVELS.keys())}")
+    # Obstacle constraints
+    OBSTACLE_MIN_X = 200
+    OBSTACLE_MAX_X = 800
+    OBSTACLE_MIN_Y = 300
+    OBSTACLE_MAX_Y = 480
+    OBSTACLE_MIN_SIZE = 10
+    OBSTACLE_MAX_SIZE = 100
     
-    json_string = PREDEFINED_LEVELS[level_name]
-    return load_custom_level(space, json_string)
+    # Generate target (house)
+    target_x = random.randint(TARGET_MIN_X, TARGET_MAX_X)
+    target_y = random.randint(TARGET_MIN_Y, TARGET_MAX_Y)
+    
+    # Generate obstacles (4-10 obstacles)
+    num_obstacles = random.randint(4, 10)
+    obstacles = []
+    
+    # Ensure at least one obstacle is on the ground for challenge
+    ground_obstacle = {
+        "x": random.randint(OBSTACLE_MIN_X, OBSTACLE_MAX_X),
+        "y": GROUND_Y,
+        "w": random.randint(OBSTACLE_MIN_SIZE, OBSTACLE_MAX_SIZE),
+        "h": random.randint(OBSTACLE_MIN_SIZE, min(OBSTACLE_MAX_SIZE, GROUND_Y - OBSTACLE_MIN_Y))
+    }
+    obstacles.append(ground_obstacle)
+    
+    # Generate remaining obstacles
+    for _ in range(num_obstacles - 1):
+        obstacle = {
+            "x": random.randint(OBSTACLE_MIN_X, OBSTACLE_MAX_X),
+            "y": random.randint(OBSTACLE_MIN_Y, OBSTACLE_MAX_Y),
+            "w": random.randint(OBSTACLE_MIN_SIZE, OBSTACLE_MAX_SIZE),
+            "h": random.randint(OBSTACLE_MIN_SIZE, OBSTACLE_MAX_SIZE)
+        }
+        obstacles.append(obstacle)
+    
+    return {
+        "targets": [{"x": target_x, "y": target_y}],
+        "obstacles": obstacles
+    }
+
 

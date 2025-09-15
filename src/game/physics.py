@@ -39,3 +39,15 @@ def is_bird_landed(bird_velocity: Tuple[float, float], threshold: float = 5.0) -
 def is_bird_out_of_bounds(bird_position: Tuple[float, float], width: float = 960) -> bool:
     """Check if bird is out of bounds"""
     return bird_position[0] > width or bird_position[0] < 0
+
+
+def is_bird_on_ground(bird_position: Tuple[float, float], ground_y: float = 500, bird_radius: float = 14) -> bool:
+    """Check if bird is on the ground (within a small tolerance)"""
+    return bird_position[1] >= ground_y - bird_radius - 5  # 5 pixel tolerance
+
+
+def apply_ground_friction(bird, friction_coefficient: float = 0.95):
+    """Apply friction to bird when it's on the ground"""
+    if bird and bird.body:
+        # Reduce horizontal velocity by friction coefficient
+        bird.body.velocity = (bird.body.velocity.x * friction_coefficient, bird.body.velocity.y)

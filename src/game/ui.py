@@ -142,7 +142,7 @@ def render_settings_tab(screen: pygame.Surface, font: pygame.font.Font, small_fo
         "GAME CONTROLS:",
         "R - Reset current level",
         "N - Next level",
-        "L - Toggle level generation (LLM/Predefined)",
+        "L - Toggle level generation (LLM/Random)",
         "",
         "VISUALIZATION:",
         f"C - Toggle charts ({'ON' if show_charts else 'OFF'})",
@@ -230,7 +230,8 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
                 show_suggestion: bool, current_suggestion, suggestion_font: pygame.font.Font,
                 episode_over: bool = False, level_number: int = 1, level_type: str = "LLM",
                 show_settings: bool = False, ai_sim_progress: float = 0.0, 
-                ai_current_sample: int = 0, ai_total_samples: int = 1000) -> None:
+                ai_current_sample: int = 0, ai_total_samples: int = 1000, 
+                show_congrats: bool = False) -> None:
     """Render the entire game"""
     # Draw solid light blue background
     screen.fill((173, 216, 230))
@@ -359,6 +360,27 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
         
         instruction_text = suggestion_font.render("Press S again to close", True, (255, 255, 255))
         screen.blit(instruction_text, (width//2 - 120, height//2 + 30))
+
+    # Congratulations message
+    if show_congrats:
+        # Create a semi-transparent overlay
+        congrats_overlay = pygame.Surface((500, 150))
+        congrats_overlay.set_alpha(220)
+        congrats_overlay.fill((0, 0, 0))
+        screen.blit(congrats_overlay, (width//2 - 250, height//2 - 75))
+        
+        # Draw border
+        pygame.draw.rect(screen, (255, 215, 0), (width//2 - 250, height//2 - 75, 500, 150), 4)
+        
+        # Congratulations text
+        congrats_text = suggestion_font.render("🎉 CONGRATULATIONS! 🎉", True, (255, 215, 0))
+        congrats_rect = congrats_text.get_rect(center=(width//2, height//2 - 30))
+        screen.blit(congrats_text, congrats_rect)
+        
+        # Moving to next level text
+        next_level_text = font.render("Moving to next level...", True, (255, 255, 255))
+        next_level_rect = next_level_text.get_rect(center=(width//2, height//2 + 10))
+        screen.blit(next_level_text, next_level_rect)
 
     # Game over message - only show when episode is actually over
     if episode_over:

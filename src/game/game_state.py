@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional, Tuple
 from .entities import create_bird, create_target
 
 
-def reset_bird(space: pymunk.Space, bird: pymunk.Circle, pos: Tuple[int, int]) -> pymunk.Circle:
+def reset_bird(space: pymunk.Space, bird: pymunk.Circle = None, pos: Tuple[int, int] = (120, 430)) -> pymunk.Circle:
     """Reset bird to starting position"""
     if bird is not None:
         space.remove(bird.body)

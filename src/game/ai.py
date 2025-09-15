@@ -85,21 +85,27 @@ def _simulate_shot(space, target, angle_deg, impulse_magnitude, max_time=2.0):
 
         bird_vel = sim_bird.body.velocity
         bird_pos = sim_bird.body.position
+        max_distance = math.sqrt(960**2 + 540**2)
+        distance_to_target = math.sqrt((bird_pos.x - target.body.position.x)**2 + (bird_pos.y - target.body.position.y)**2)
+
+        # Apply ground friction when bird is on the floor
+        if physics.is_bird_on_ground((bird_pos.x, bird_pos.y)):
+            physics.apply_ground_friction(sim_bird)
 
         # Check for target hit
         if entities.check_target_hit(sim_bird, sim_target):
-            return True
+            return True, 0.0
 
          # Reset bird if it's moving very slowly (landed)
         if (physics.is_bird_landed((bird_vel.x, bird_vel.y)) and 
             bird_pos.x > 150):
-            return False
+            return False, distance_to_target/max_distance
 
         # Reset bird if it goes out of bounds
         if physics.is_bird_out_of_bounds((bird_pos.x, bird_pos.y)):
-            return False
+            return False, 1.0
     
-    return False  # Max steps reached - consider it a miss
+    return False, 1.0  # Max steps reached - consider it a miss
 
 def _let_target_fall_to_rest(space, target, max_steps=300):
     """
@@ -167,7 +173,7 @@ def update_ai_simulation(space, target, sim_state: SimulationState,
         # Run one simulation sample with timeout
         angle = random.uniform(angle_min, angle_max)
         impulse_magnitude = random.uniform(impulse_min, impulse_max)
-        hit = _simulate_shot(space, target, angle, impulse_magnitude, max_time=2.0)
+        hit, distance_to_target = _simulate_shot(space, target, angle, impulse_magnitude, max_time=2.0)
         
         sim_state.results.append((hit, angle, impulse_magnitude))
         sim_state.current_sample += 1
@@ -216,58 +222,3 @@ def stop_ai_simulation(sim_state: SimulationState):
     sim_state.running = False
     sim_state.should_stop = True
 
-# Legacy function for backward compatibility
-def suggest_best_shot(space, target, angle_min=0, angle_max=90, impulse_min=100, impulse_max=1200, N_SAMPLES = 1000, plot=False):   
-    """Legacy synchronous function - kept for backward compatibility"""
-    results = []
-
-    for _ in range(N_SAMPLES):
-        # Simple progress bar
-        bar_length = 30
-        progress = (_ + 1) / N_SAMPLES
-        filled_length = int(bar_length * progress)
-        bar = '=' * filled_length + '-' * (bar_length - filled_length)
-        print(f"\rSimulation Progress: |{bar}| {(_ + 1)}/{N_SAMPLES}", end='', flush=True)
-        if _ + 1 == N_SAMPLES:
-            print()  # Newline at end
-        angle = random.uniform(angle_min, angle_max)
-        impulse_magnitude = random.uniform(impulse_min, impulse_max)
-        hit = _simulate_shot(
-            space, target, angle, impulse_magnitude
-        )
-        results.append((hit, angle, impulse_magnitude))
-    
-    # Create scatter plot if requested
-    if plot and results:
-        angles = [result[1] for result in results]
-        impulses = [result[2] for result in results]
-        hits = [result[0] for result in results]
-        
-        # Separate hits and misses
-        hit_angles = [angle for angle, hit in zip(angles, hits) if hit]
-        hit_impulses = [impulse for impulse, hit in zip(impulses, hits) if hit]
-        miss_angles = [angle for angle, hit in zip(angles, hits) if not hit]
-        miss_impulses = [impulse for impulse, hit in zip(impulses, hits) if not hit]
-        
-        plt.figure(figsize=(10, 6))
-        plt.scatter(hit_angles, hit_impulses, color='blue', alpha=0.6, label='Hit', s=30)
-        plt.scatter(miss_angles, miss_impulses, color='red', alpha=0.6, label='Miss', s=30)
-        plt.xlabel('Angle (degrees)')
-        plt.ylabel('Impulse Magnitude')
-        plt.title('Shot Results: Angle vs Impulse Magnitude')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.show()
-            
-    if results:
-        # Pick the last result where hit=True
-        for hit, angle, impulse_magnitude in reversed(results):
-            if hit:
-                best_angle = angle
-                best_impulse_magnitude = impulse_magnitude
-                return ShotSuggestion(angle_deg=best_angle, impulse_magnitude=best_impulse_magnitude)
-        else:
-            print("No result found")
-            return None
-
-    
