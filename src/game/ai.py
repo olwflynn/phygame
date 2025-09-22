@@ -78,7 +78,7 @@ def _simulate_shot(space, target, angle_deg, impulse_magnitude, max_time=2.0):
     while step_count < max_steps:
         # Check timeout
         if time.time() - start_time > max_time:
-            return False  # Timeout - consider it a miss
+            return False, 1.0  # Timeout - consider it a miss with max distance
         
         sim_space.step(1/60)
         step_count += 1

@@ -176,7 +176,7 @@ def load_next_level(space, use_llm: bool = True, prev_bird: pymunk.Circle = None
     return load_level(space, level_data, prev_bird=prev_bird, prev_target=prev_target)
 
 
-def generate_random_level() -> Dict[str, Any]:
+def generate_random_level(MAX_OBSTACLES=5) -> Dict[str, Any]:
     """Generate a random level for the physics game"""
 
     GROUND_Y = 500
@@ -200,7 +200,7 @@ def generate_random_level() -> Dict[str, Any]:
     target_y = random.randint(TARGET_MIN_Y, TARGET_MAX_Y)
     
     # Generate obstacles (4-10 obstacles)
-    num_obstacles = random.randint(4, 10)
+    num_obstacles = random.randint(3, MAX_OBSTACLES)
     obstacles = []
     
     # Ensure at least one obstacle is on the ground for challenge

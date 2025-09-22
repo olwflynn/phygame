@@ -14,6 +14,8 @@ from .game.ui import update_charts, create_shot_table, render_game
 from .game.game_state import reset_bird, reset_target, create_shot_data, update_shot_data, finalize_shot_data, restart_simulation
 from .game.physics import calculate_launch_parameters, is_bird_landed, is_bird_out_of_bounds, is_bird_on_ground, apply_ground_friction
 from .game.levels import load_level, load_next_level
+# Add imports for AI mode
+from .game.train_rl import RLPolicy, get_action, load_model
 
 def main() -> None:
     pygame.init()
@@ -59,6 +61,14 @@ def main() -> None:
         show_suggestion = False  # Whether to show AI suggestion
         current_suggestion = None  # Current AI suggestion
 
+        # AI Mode state
+        ai_mode = False  # Whether AI mode is active
+        ai_policy = None  # The loaded RL policy
+        ai_shot_timer = 0  # Timer for AI shot delay
+        ai_shot_delay = 60  # Frames to wait before AI takes shot (1 second at 60 FPS)
+        ai_thinking = False  # Whether AI is currently "thinking"
+        ai_shot_count = 0  # Track AI shots for display
+
         # Chart management
         show_charts = False  # Start with charts hidden
         chart_window_open = False
@@ -90,20 +100,76 @@ def main() -> None:
         # Suggest best shot state
         suggestion_font = pygame.font.Font(None, 28)  # Font for suggestion display
 
+        def load_ai_policy():
+            """Load the trained RL policy"""
+            try:
+                policy = load_model("rl_policy.pth")
+                policy.eval()  # Set to evaluation mode
+                print("AI Policy loaded successfully!")
+                return policy
+            except Exception as e:
+                print(f"Failed to load AI policy: {e}")
+                return None
+
+        def ai_take_shot():
+            """Make the AI take a shot using the loaded policy"""
+            nonlocal shots_fired, ai_shot_count, current_shot_data  # Declare nonlocal variables
+            
+            if ai_policy is None or shots_fired >= max_shots or episode_over:
+                return False
+            
+            try:
+                # Get current game state
+                state = (space, bird, targets, obstacles)
+                
+                # Get action from policy
+                action_dict = get_action(ai_policy, state)
+                angle_deg, impulse_magnitude = action_dict["samples"]
+                
+                # Convert to velocity vector
+                angle_rad = math.radians(angle_deg.item())
+                vx = impulse_magnitude.item() * math.cos(angle_rad)
+                vy = -impulse_magnitude.item() * math.sin(angle_rad)  # Negative because y increases downward
+                velocity = (vx, vy)
+                
+                # Apply the shot
+                bird.body.apply_impulse_at_local_point(velocity)
+                
+                # Update shot data
+                current_shot_data = create_shot_data(shots_fired + 1, time.time(), bird.body.position)
+                current_shot_data = update_shot_data(
+                    current_shot_data, 
+                    bird.body.position,  # End position same as start for AI
+                    velocity, 
+                    impulse_magnitude.item(), 
+                    angle_deg.item(), 
+                    0.0  # No drag distance for AI
+                )
+                shots_fired += 1
+                ai_shot_count += 1
+                
+                print(f"AI Shot {ai_shot_count}: Angle={angle_deg.item():.1f}°, Impulse={impulse_magnitude.item():.1f}")
+                
+                return True
+                
+            except Exception as e:
+                print(f"AI shot failed: {e}")
+                return False
+
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Allow mouse interactions even during AI simulation
-                    if shots_fired < max_shots and bird.body.position.x < 500 and not episode_over and not show_settings:
+                    # Only allow mouse interactions if not in AI mode
+                    if not ai_mode and shots_fired < max_shots and bird.body.position.x < 500 and not episode_over and not show_settings:
                         start_pos = pygame.mouse.get_pos()
                         launching = True
                         # Start tracking shot data
                         current_shot_data = create_shot_data(shots_fired + 1, time.time(), start_pos)
 
-                elif event.type == pygame.MOUSEBUTTONUP and launching:
+                elif event.type == pygame.MOUSEBUTTONUP and launching and not ai_mode:
                     end_pos = pygame.mouse.get_pos()
 
                     # Calculate launch parameters
@@ -130,6 +196,7 @@ def main() -> None:
                         score = 0
                         shots_fired = 0
                         episode_over = False  # Reset episode state
+                        ai_shot_count = 0  # Reset AI shot count
                         # Clear chart data on reset
                         time_data.clear()
                         x_pos_data.clear()
@@ -151,6 +218,7 @@ def main() -> None:
                             shots_fired = 0
                             episode_over = False
                             level_number += 1
+                            ai_shot_count = 0  # Reset AI shot count
                             
                             # Clear chart data for new level
                             time_data.clear()
@@ -210,6 +278,53 @@ def main() -> None:
                             # Hide suggestion
                             show_suggestion = False
                             current_suggestion = None
+                    elif event.key == pygame.K_a:  # Toggle AI Mode
+                        if not ai_mode:
+                            # Enable AI mode
+                            ai_policy = load_ai_policy()
+                            if ai_policy is not None:
+                                ai_mode = True
+                                ai_thinking = True
+                                ai_shot_timer = 0
+                                ai_shot_count = 0
+                                print("AI Mode enabled - AI will take over!")
+                            else:
+                                print("Failed to load AI policy - AI mode not enabled")
+                        else:
+                            # Disable AI mode
+                            ai_mode = False
+                            ai_thinking = False
+                            ai_shot_timer = 0
+                            print("AI Mode disabled - Manual control restored")
+
+            # AI Mode logic
+            if ai_mode and ai_policy is not None:
+                # Check if bird is ready for next shot (not moving and in starting position)
+                bird_vel = bird.body.velocity
+                bird_pos = bird.body.position
+                
+                # If bird is stationary and in starting area, start thinking about next shot
+                if (abs(bird_vel.x) < 1 and abs(bird_vel.y) < 1 and 
+                    bird_pos.x < 200 and shots_fired < max_shots and not episode_over):
+                    
+                    if not ai_thinking:
+                        ai_thinking = True
+                        ai_shot_timer = 0
+                        print("AI is thinking...")
+                    
+                    ai_shot_timer += 1
+                    
+                    # Take shot after delay
+                    if ai_shot_timer >= ai_shot_delay:
+                        if ai_take_shot():
+                            ai_thinking = False
+                            ai_shot_timer = 0
+                        else:
+                            ai_thinking = False
+                            ai_shot_timer = 0
+                else:
+                    ai_thinking = False
+                    ai_shot_timer = 0
 
             # Update AI simulation
             if ai_sim_state.running:
@@ -278,6 +393,7 @@ def main() -> None:
                     shots_fired = 0  # Reset shots to 0, max_shots stays 3
                     episode_over = False
                     level_number += 1
+                    ai_shot_count = 0  # Reset AI shot count
                     
                     # Clear chart data for new level
                     time_data.clear()
@@ -330,7 +446,7 @@ def main() -> None:
                     episode_over = True
 
             # Render everything
-            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type, show_settings, ai_sim_state.progress, ai_sim_state.current_sample, ai_sim_state.total_samples, show_congrats)
+            render_game(screen, space, bird, target, obstacles, launching, start_pos, velocity_multiplier, score, shots_fired, max_shots, font, width, height, show_charts, show_table, show_suggestion, current_suggestion, suggestion_font, episode_over, level_number, current_level_type, show_settings, ai_sim_state.progress, ai_sim_state.current_sample, ai_sim_state.total_samples, show_congrats, ai_mode, ai_thinking, ai_shot_count)
 
             pygame.display.flip()
             clock.tick(60)

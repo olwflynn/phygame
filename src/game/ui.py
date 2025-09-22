@@ -231,7 +231,8 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
                 episode_over: bool = False, level_number: int = 1, level_type: str = "LLM",
                 show_settings: bool = False, ai_sim_progress: float = 0.0, 
                 ai_current_sample: int = 0, ai_total_samples: int = 1000, 
-                show_congrats: bool = False) -> None:
+                show_congrats: bool = False, ai_mode: bool = False, 
+                ai_thinking: bool = False, ai_shot_count: int = 0) -> None:
     """Render the entire game"""
     # Draw solid light blue background
     screen.fill((173, 216, 230))
@@ -271,8 +272,13 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
     
     # Draw bird (simple colored circle for now - replace with image later)
     bird_pos = bird.body.position
-    pygame.draw.circle(screen, (255, 165, 0), (int(bird_pos.x), int(bird_pos.y)), 14)  # Orange bird
-    pygame.draw.circle(screen, (255, 69, 0), (int(bird_pos.x), int(bird_pos.y)), 14, 2)  # Red border
+    # Change bird color based on AI mode
+    if ai_mode:
+        pygame.draw.circle(screen, (0, 255, 0), (int(bird_pos.x), int(bird_pos.y)), 14)  # Green bird for AI mode
+        pygame.draw.circle(screen, (0, 200, 0), (int(bird_pos.x), int(bird_pos.y)), 14, 2)  # Dark green border
+    else:
+        pygame.draw.circle(screen, (255, 165, 0), (int(bird_pos.x), int(bird_pos.y)), 14)  # Orange bird
+        pygame.draw.circle(screen, (255, 69, 0), (int(bird_pos.x), int(bird_pos.y)), 14, 2)  # Red border
     
     # Draw obstacles
     for obstacle, size in obstacles:
@@ -284,8 +290,8 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
         top_left_y = int(obstacle_pos.y - obstacle_height/2)
         pygame.draw.rect(screen, (100, 100, 100), (top_left_x, top_left_y, int(obstacle_width), int(obstacle_height)))
 
-    # Draw launch line while dragging
-    if launching and start_pos:
+    # Draw launch line while dragging (only in manual mode)
+    if launching and start_pos and not ai_mode:
         current_pos = pygame.mouse.get_pos()
         # Draw dashed line to show launch direction
         pygame.draw.line(screen, (255, 255, 0), start_pos, current_pos, 3)
@@ -328,17 +334,36 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
     shots_text = font.render(f"Shots: {max_shots - shots_fired}/{max_shots}", True, (255, 255, 255))
     screen.blit(shots_text, (20, 100))
     
-    # Settings button
-    settings_text = font.render("Press TAB for Settings", True, (255, 255, 0))
-    screen.blit(settings_text, (20, 140))
+    # AI Mode status
+    if ai_mode:
+        ai_mode_text = font.render("AI MODE ACTIVE", True, (0, 255, 0))
+        screen.blit(ai_mode_text, (20, 140))
+        
+        if ai_thinking:
+            thinking_text = font.render("AI Thinking...", True, (255, 255, 0))
+            screen.blit(thinking_text, (20, 180))
+        
+        ai_shots_text = font.render(f"AI Shots: {ai_shot_count}", True, (0, 255, 0))
+        screen.blit(ai_shots_text, (20, 220))
+        
+        ai_instruction_text = font.render("Press A to disable AI", True, (255, 255, 0))
+        screen.blit(ai_instruction_text, (20, 260))
+    else:
+        # Settings button
+        settings_text = font.render("Press TAB for Settings", True, (255, 255, 0))
+        screen.blit(settings_text, (20, 140))
+        
+        # AI mode instruction
+        ai_instruction_text = font.render("Press A for AI Mode", True, (0, 255, 0))
+        screen.blit(ai_instruction_text, (20, 180))
     
-    # AI simulation status (only show if not running)
-    if ai_sim_progress == 0 and show_suggestion and current_suggestion:
+    # AI simulation status (only show if not running and not in AI mode)
+    if not ai_mode and ai_sim_progress == 0 and show_suggestion and current_suggestion:
         ai_status_text = font.render("AI Suggestion Available", True, (0, 255, 0))
-        screen.blit(ai_status_text, (20, 180))
+        screen.blit(ai_status_text, (20, 220))
 
-    # Display AI suggestion if active
-    if show_suggestion and current_suggestion and ai_sim_progress == 0:
+    # Display AI suggestion if active (only in manual mode)
+    if not ai_mode and show_suggestion and current_suggestion and ai_sim_progress == 0:
         # Create a semi-transparent overlay
         overlay = pygame.Surface((400, 200))
         overlay.set_alpha(200)
@@ -393,7 +418,7 @@ def render_game(screen: pygame.Surface, space, bird, target, obstacles, launchin
         render_settings_tab(screen, font, small_font, show_charts, show_table, 
                            show_suggestion, level_type, width, height)
     
-    # Render AI simulation progress in top right corner if active
-    if ai_sim_progress > 0:
+    # Render AI simulation progress in top right corner if active (only in manual mode)
+    if not ai_mode and ai_sim_progress > 0:
         render_ai_simulation_progress_corner(screen, font, ai_sim_progress, ai_current_sample, 
                                             ai_total_samples, width, height)
